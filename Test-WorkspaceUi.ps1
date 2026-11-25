@@ -44,6 +44,7 @@ foreach ($name in $preferences.Keys) {
 $config.Save($configPath)
 
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
@@ -72,6 +73,18 @@ try {
     if (($rect.Right - $rect.Left) -lt 900) { throw 'Did not find the main mRemoteNG window.' }
 
     Start-Sleep -Seconds 2
+    try {
+        $window = [Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
+        $name = New-Object Windows.Automation.PropertyCondition ([Windows.Automation.AutomationElement]::NameProperty, 'demo-rdp-02')
+        $row = $window.FindFirst([Windows.Automation.TreeScope]::Descendants, $name)
+        $selection = $null
+        if ($row -and $row.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern, [ref] $selection)) {
+            $selection.Select()
+            Start-Sleep -Milliseconds 500
+        }
+    } catch {
+        Write-Host 'The sample row could not be selected through UI Automation.'
+    }
     $bitmap = New-Object Drawing.Bitmap (($rect.Right - $rect.Left), ($rect.Bottom - $rect.Top), [Drawing.Imaging.PixelFormat]::Format24bppRgb)
     $g = [Drawing.Graphics]::FromImage($bitmap)
     try {

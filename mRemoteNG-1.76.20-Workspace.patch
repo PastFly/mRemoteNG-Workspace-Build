@@ -80,6 +80,25 @@ index aaac65bdd441f522de44634f93d7a76b7706d60b..657818740e677d32c4a610f651cf370f
 -}
 \ No newline at end of file
 +}
+diff --git a/mRemoteV1/Config/Settings/ExternalAppsLoader.cs b/mRemoteV1/Config/Settings/ExternalAppsLoader.cs
+index ee0645074b10a195ddd8550aa0c6d6b31c8713f3..5868ec069389c6a7a81f422b024e466db643fcd9 100644
+--- a/mRemoteV1/Config/Settings/ExternalAppsLoader.cs
++++ b/mRemoteV1/Config/Settings/ExternalAppsLoader.cs
+@@ -53,7 +53,6 @@ namespace mRemoteNG.Config.Settings
+ #endif
+             else
+             {
+-                _messageCollector.AddMessage(MessageClass.WarningMsg, "Loading External Apps failed: Could not FIND file!");
+                 return;
+             }
+ 
+@@ -101,4 +100,4 @@ namespace mRemoteNG.Config.Settings
+             _externalToolsToolStrip.AddExternalToolsToToolBar();
+         }
+     }
+-}
+\ No newline at end of file
++}
 diff --git a/mRemoteV1/Config/Settings/SettingsLoader.cs b/mRemoteV1/Config/Settings/SettingsLoader.cs
 index a730dac69b31627b73bf60cd5b62a90472ab11fa..dc7bfbd0a77c164c3c466052646a71a301ad5af2 100644
 --- a/mRemoteV1/Config/Settings/SettingsLoader.cs
@@ -1635,23 +1654,26 @@ index 08a0ef4ab29de5fa5462e425c556a91440a052a3..c037d35952101d55457666d0edd4ecd3
 \ No newline at end of file
 +}
 diff --git a/mRemoteV1/UI/Window/ConnectionWindow.cs b/mRemoteV1/UI/Window/ConnectionWindow.cs
-index 1b0a94128dc1b9f614790d4fb58289e242006f6a..821f6e8fa6f51d1f7f16d6f8805c64744636ca36 100644
+index 1b0a94128dc1b9f614790d4fb58289e242006f6a..1df242c6dc289561cccb3646559d884f2c0d1262 100644
 --- a/mRemoteV1/UI/Window/ConnectionWindow.cs
 +++ b/mRemoteV1/UI/Window/ConnectionWindow.cs
-@@ -31,6 +31,41 @@ namespace mRemoteNG.UI.Window
+@@ -31,6 +31,44 @@ namespace mRemoteNG.UI.Window
          private VisualStudioToolStripExtender vsToolStripExtender;
          private readonly ToolStripRenderer _toolStripProfessionalRenderer = new ToolStripProfessionalRenderer();
  
 +        private sealed class WorkspaceSessionTabs : TabControl
 +        {
-+            internal bool UseWorkspacePalette { get; set; }
++            private bool _useWorkspacePalette;
 +
-+            protected override void OnPaintBackground(PaintEventArgs e)
++            internal bool UseWorkspacePalette
 +            {
-+                base.OnPaintBackground(e);
-+                if (!UseWorkspacePalette) return;
-+                using (var fill = new SolidBrush(Color.FromArgb(27, 34, 48)))
-+                    e.Graphics.FillRectangle(fill, TabsAreaRect);
++                get { return _useWorkspacePalette; }
++                set
++                {
++                    if (_useWorkspacePalette == value) return;
++                    _useWorkspacePalette = value;
++                    Style = value ? Crownwood.Magic.Common.VisualStyle.Plain : Crownwood.Magic.Common.VisualStyle.IDE;
++                }
 +            }
 +
 +            protected override void DrawTabBorder(ref Rectangle rectTab, TabPage page, Graphics graphics)
@@ -1680,7 +1702,7 @@ index 1b0a94128dc1b9f614790d4fb58289e242006f6a..821f6e8fa6f51d1f7f16d6f8805c6474
          #region Public Methods
          public ConnectionWindow(DockContent panel, string formText = "")
          {
-@@ -175,16 +210,28 @@ namespace mRemoteNG.UI.Window
+@@ -175,16 +213,28 @@ namespace mRemoteNG.UI.Window
  
          private new void ApplyTheme()
          {
@@ -1716,7 +1738,7 @@ index 1b0a94128dc1b9f614790d4fb58289e242006f6a..821f6e8fa6f51d1f7f16d6f8805c6474
          }
  
          private bool _documentHandlersAdded;
-@@ -925,4 +972,4 @@ namespace mRemoteNG.UI.Window
+@@ -925,4 +975,4 @@ namespace mRemoteNG.UI.Window
          }
          #endregion
      }
