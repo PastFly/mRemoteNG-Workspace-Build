@@ -1,5 +1,186 @@
+diff --git a/InstallerProjects/Installer/mRemoteNGV1.wxs b/InstallerProjects/Installer/mRemoteNGV1.wxs
+index f2ae4163a31c01075e054d5f40074e4999650dcd..d6831700b5b85151b4cc3bd230dd4e2f36c55936 100644
+--- a/InstallerProjects/Installer/mRemoteNGV1.wxs
++++ b/InstallerProjects/Installer/mRemoteNGV1.wxs
+@@ -7,7 +7,7 @@
+            UpgradeCode="$(var.UpgradeCode)" 
+            Language="1033">
+     <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
+-    <MajorUpgrade DowngradeErrorMessage="!(loc.Upgrade_NewerVersionInstalled)" Schedule="afterInstallExecute" />
++    <MajorUpgrade DowngradeErrorMessage="!(loc.Upgrade_NewerVersionInstalled)" Schedule="afterInstallExecute" AllowSameVersionUpgrades="yes" />
+     <MediaTemplate EmbedCab="yes" />
+     <Binary Id="CustomActions.CA.dll" SourceFile="$(var.SolutionDir)InstallerProjects\CustomActions\bin\$(var.Configuration)\CustomActions.CA.dll" />
+     <Property Id="MsiLogging" Value="v" />
+@@ -114,4 +114,4 @@
+     <Property Id="WixShellExecTarget" Value="[#MainExeFile]" />
+     <CustomAction Id="LaunchApplication" BinaryKey="WixCA" DllEntry="WixShellExec" Impersonate="yes" />
+   </Product>
+-</Wix>
+\ No newline at end of file
++</Wix>
+diff --git a/Tools/copy_themes.ps1 b/Tools/copy_themes.ps1
+index a5914ee5704978d1ae37cee1b3204280fbe0a9d8..afa2e2aa0a27596ddc43993df8f835650797f5a8 100644
+--- a/Tools/copy_themes.ps1
++++ b/Tools/copy_themes.ps1
+@@ -15,5 +15,6 @@ $sourceFiles = [io.path]::combine($SolutionDir , 'mRemoteV1\Resources\Themes' )
+ $DestinationDir = [io.path]::combine($TargetDir , 'Themes') 
+ 
+ robocopy $sourceFiles $DestinationDir *.vstheme /s
++Copy-Item -LiteralPath (Join-Path $sourceFiles 'darcula.vstheme') -Destination (Join-Path $DestinationDir 'Workspace.vstheme') -Force
+ 
+-Write-Output ""
+\ No newline at end of file
++Write-Output ""
+diff --git a/mRemoteV1/App/Info/SettingsFileInfo.cs b/mRemoteV1/App/Info/SettingsFileInfo.cs
+index a91d9497a366230d0568c3a70d947decc0cf35f5..d228d3e1a879617dfd7194bbddbadb7fc9b7b947 100644
+--- a/mRemoteV1/App/Info/SettingsFileInfo.cs
++++ b/mRemoteV1/App/Info/SettingsFileInfo.cs
+@@ -11,10 +11,11 @@ namespace mRemoteNG.App.Info
+         private static readonly string ExePath = Path.GetDirectoryName(Assembly.GetAssembly(typeof(ConnectionInfo))?.Location);
+ 
+         public static string SettingsPath => Runtime.IsPortableEdition ? ExePath : Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\" + Application.ProductName;
+-        public static string LayoutFileName { get; } = "pnlLayout.xml";
++        public static string LayoutFileName { get; } = "pnlLayout.Workspace.xml";
++        public static bool HasWorkspaceLayout => File.Exists(Path.Combine(SettingsPath, LayoutFileName));
+         public static string ExtAppsFilesName { get; } = "extApps.xml";
+         public static string ThemesFileName { get; } = "Themes.xml";
+         public static string ThemeFolder { get; } = SettingsPath != null ?  Path.Combine(SettingsPath, "Themes") : String.Empty;
+         public static string InstalledThemeFolder { get; } = ExePath != null ?  Path.Combine(ExePath, "Themes") : String.Empty;
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/mRemoteV1/App/NativeMethods.cs b/mRemoteV1/App/NativeMethods.cs
+index aaac65bdd441f522de44634f93d7a76b7706d60b..657818740e677d32c4a610f651cf370ff299fdb8 100644
+--- a/mRemoteV1/App/NativeMethods.cs
++++ b/mRemoteV1/App/NativeMethods.cs
+@@ -11,6 +11,18 @@ namespace mRemoteNG.App
+     public static class NativeMethods
+     {
+         #region Functions
++        [DllImport("dwmapi.dll")]
++        private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
++
++        internal static void SetDarkWindowCaption(IntPtr window, bool enabled)
++        {
++            const int useImmersiveDarkMode = 20;
++            const int useImmersiveDarkModeBefore20H1 = 19;
++            int value = enabled ? 1 : 0;
++            if (DwmSetWindowAttribute(window, useImmersiveDarkMode, ref value, sizeof(int)) != 0)
++                DwmSetWindowAttribute(window, useImmersiveDarkModeBefore20H1, ref value, sizeof(int));
++        }
++
+         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+         internal static extern bool AppendMenu(IntPtr hMenu, int uFlags, IntPtr uIDNewItem, string lpNewItem);
+ 			
+@@ -498,4 +510,4 @@ namespace mRemoteNG.App
+ 
+         #endregion
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/mRemoteV1/Config/Settings/SettingsLoader.cs b/mRemoteV1/Config/Settings/SettingsLoader.cs
+index a730dac69b31627b73bf60cd5b62a90472ab11fa..dc7bfbd0a77c164c3c466052646a71a301ad5af2 100644
+--- a/mRemoteV1/Config/Settings/SettingsLoader.cs
++++ b/mRemoteV1/Config/Settings/SettingsLoader.cs
+@@ -74,10 +74,7 @@ namespace mRemoteNG.Config.Settings
+ 				LoadExternalAppsFromXml();
+                 SetAlwaysShowPanelTabs();
+ 						
+-				if (mRemoteNG.Settings.Default.ResetToolbars)
+-                    SetToolbarsDefault();
+-				else
+-                    LoadToolbarsFromSettings();
++                LoadToolbarsFromSettings();
+ 			}
+ 			catch (Exception ex)
+ 			{
+@@ -191,35 +188,27 @@ namespace mRemoteNG.Config.Settings
+             mRemoteNG.Settings.Default.UpdatePending = false;
+         }
+ 
+-	    private void SetToolbarsDefault()
+-		{
+-			ToolStripPanelFromString("top").Join(_quickConnectToolStrip, new Point(300, 0));
+-            _quickConnectToolStrip.Visible = true;
+-			ToolStripPanelFromString("bottom").Join(_externalToolsToolStrip, new Point(3, 0));
+-            _externalToolsToolStrip.Visible = false;
+-		}
+-
+ 	    private void LoadToolbarsFromSettings()
+ 		{
+             ResetAllToolbarLocations();
+ 		    AddMainMenuPanel();
+-            AddExternalAppsPanel();
+-		    AddQuickConnectPanel();
++            bool resetToolbars = mRemoteNG.Settings.Default.ResetToolbars;
++            AddQuickConnectPanel(resetToolbars || !SettingsFileInfo.HasWorkspaceLayout, resetToolbars);
++            AddExternalAppsPanel(resetToolbars);
+ 		    AddMultiSshPanel();
+         }
+ 
+         /// <summary>
+         /// This prevents odd positioning issues due to toolbar load order.
+-        /// Since all toolbars start in this temp panel, no toolbar load
++        /// Since all toolbars are detached initially, no toolbar load
+         /// can be blocked by pre-existing toolbars.
+         /// </summary>
+ 	    private void ResetAllToolbarLocations()
+ 	    {
+-	        var tempToolStrip = new ToolStripPanel();
+-            tempToolStrip.Join(_mainMenu);
+-	        tempToolStrip.Join(_quickConnectToolStrip);
+-	        tempToolStrip.Join(_externalToolsToolStrip);
+-	        tempToolStrip.Join(_multiSshToolStrip);
++            _mainMenu.Parent?.Controls.Remove(_mainMenu);
++            _quickConnectToolStrip.Parent?.Controls.Remove(_quickConnectToolStrip);
++            _externalToolsToolStrip.Parent?.Controls.Remove(_externalToolsToolStrip);
++            _multiSshToolStrip.Parent?.Controls.Remove(_multiSshToolStrip);
+         }
+ 
+ 	    private void AddMainMenuPanel()
+@@ -229,17 +218,28 @@ namespace mRemoteNG.Config.Settings
+ 	        toolStripPanel.Join(_mainMenu, new Point(3, 0));
+         }
+ 
+-		private void AddQuickConnectPanel()
++		private void AddQuickConnectPanel(bool useWorkspacePosition, bool resetToolbars)
+ 		{
+ 		    SetToolstripGripStyle(_quickConnectToolStrip);
+-            _quickConnectToolStrip.Visible = mRemoteNG.Settings.Default.QuickyTBVisible;
++            _quickConnectToolStrip.Visible = resetToolbars || mRemoteNG.Settings.Default.QuickyTBVisible;
++            if (useWorkspacePosition)
++            {
++                MainForm.PlaceWorkspaceQuickConnect();
++                return;
++            }
+             var toolStripPanel = ToolStripPanelFromString(mRemoteNG.Settings.Default.QuickyTBParentDock);
+             toolStripPanel.Join(_quickConnectToolStrip, mRemoteNG.Settings.Default.QuickyTBLocation);
+ 		}
+ 		
+-		private void AddExternalAppsPanel()
++		private void AddExternalAppsPanel(bool resetToolbars)
+ 		{
+ 		    SetToolstripGripStyle(_externalToolsToolStrip);
++            if (resetToolbars)
++            {
++                _externalToolsToolStrip.Visible = false;
++                ToolStripPanelFromString("bottom").Join(_externalToolsToolStrip, new Point(3, 0));
++                return;
++            }
+             _externalToolsToolStrip.Visible = mRemoteNG.Settings.Default.ExtAppsTBVisible;
+             var toolStripPanel = ToolStripPanelFromString(mRemoteNG.Settings.Default.ExtAppsTBParentDock);
+             toolStripPanel.Join(_externalToolsToolStrip, mRemoteNG.Settings.Default.ExtAppsTBLocation);
+@@ -283,4 +283,4 @@ namespace mRemoteNG.Config.Settings
+         }
+         #endregion
+ 	}
+-}
+\ No newline at end of file
++}
 diff --git a/mRemoteV1/Properties/Settings.Designer.cs b/mRemoteV1/Properties/Settings.Designer.cs
-index e6dcfb9..e8fc7c8 100644
+index e6dcfb9a22ee56c4d272cc6533e9e57879e1370e..078ccc4ec79b2ac56cd15195eb132e72433174ca 100644
 --- a/mRemoteV1/Properties/Settings.Designer.cs
 +++ b/mRemoteV1/Properties/Settings.Designer.cs
 @@ -721,7 +721,7 @@ namespace mRemoteNG {
@@ -16,7 +197,7 @@ index e6dcfb9..e8fc7c8 100644
          [global::System.Configuration.UserScopedSettingAttribute()]
          [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
 -        [global::System.Configuration.DefaultSettingValueAttribute("")]
-+        [global::System.Configuration.DefaultSettingValueAttribute("darcula")]
++        [global::System.Configuration.DefaultSettingValueAttribute("Workspace")]
          public string ThemeName {
              get {
                  return ((string)(this["ThemeName"]));
@@ -30,7 +211,7 @@ index e6dcfb9..e8fc7c8 100644
              get {
                  return ((bool)(this["ThemingActive"]));
 diff --git a/mRemoteV1/Properties/Settings.settings b/mRemoteV1/Properties/Settings.settings
-index 3d680b5..9c40aaf 100644
+index 3d680b553f63a6fac934bef7cb41b07554c79494..54f0ce4922f543b35b6aa73babc99400d314c7a0 100644
 --- a/mRemoteV1/Properties/Settings.settings
 +++ b/mRemoteV1/Properties/Settings.settings
 @@ -177,7 +177,7 @@
@@ -47,7 +228,7 @@ index 3d680b5..9c40aaf 100644
      </Setting>
      <Setting Name="ThemeName" Type="System.String" Scope="User">
 -      <Value Profile="(Default)" />
-+      <Value Profile="(Default)">darcula</Value>
++      <Value Profile="(Default)">Workspace</Value>
      </Setting>
      <Setting Name="ShowConfigHelpText" Type="System.Boolean" Scope="User">
        <Value Profile="(Default)">True</Value>
@@ -61,7 +242,7 @@ index 3d680b5..9c40aaf 100644
      <Setting Name="ConDefaultUsername" Type="System.String" Scope="User">
        <Value Profile="(Default)" />
 diff --git a/mRemoteV1/Resources/Themes/darcula.vstheme b/mRemoteV1/Resources/Themes/darcula.vstheme
-index 9958fff..61be62a 100644
+index 9958fff5f1992b642dfa65f7a308fc7e9fe65a38..61be62a75a3df5a3649deae51561bef512ec9d27 100644
 --- a/mRemoteV1/Resources/Themes/darcula.vstheme
 +++ b/mRemoteV1/Resources/Themes/darcula.vstheme
 @@ -106,15 +106,15 @@
@@ -384,10 +565,17 @@ index 9958fff..61be62a 100644
        <Color Name="FocusVisualBorder">
          <Background Type="CT_RAW" Source="FF4B6EAF" />
 diff --git a/mRemoteV1/UI/Controls/QuickConnectToolStrip.cs b/mRemoteV1/UI/Controls/QuickConnectToolStrip.cs
-index 029b13c..7422e94 100644
+index 029b13c19a44ccc1375a8a090285c96682653874..120db786aad77fa144a02efc42ceeea532acd257 100644
 --- a/mRemoteV1/UI/Controls/QuickConnectToolStrip.cs
 +++ b/mRemoteV1/UI/Controls/QuickConnectToolStrip.cs
-@@ -8,6 +8,7 @@ using mRemoteNG.Connection.Protocol;
+@@ -1,5 +1,6 @@
+ ﻿using System;
+ using System.ComponentModel;
++using System.Drawing;
+ using System.Linq;
+ using System.Windows.Forms;
+ using mRemoteNG.App;
+@@ -8,6 +9,7 @@ using mRemoteNG.Connection.Protocol;
  using mRemoteNG.Container;
  using mRemoteNG.Themes;
  using mRemoteNG.Tools;
@@ -395,7 +583,34 @@ index 029b13c..7422e94 100644
  
  namespace mRemoteNG.UI.Controls
  {
-@@ -53,6 +54,8 @@ namespace mRemoteNG.UI.Controls
+@@ -16,7 +18,8 @@ namespace mRemoteNG.UI.Controls
+         private IContainer components;
+         private ToolStripLabel _lblQuickConnect;
+         private ToolStripDropDownButton _btnConnections;
+-        private ToolStripSplitButton _btnQuickConnect;
++        private ToolStripDropDownButton _btnQuickConnect;
++        private Button _connectButton;
+         private ContextMenuStrip _mnuQuickConnectProtocol;
+         private QuickConnectComboBox _cmbQuickConnect;
+         private ContextMenuStrip _mnuConnections;
+@@ -49,10 +52,24 @@ namespace mRemoteNG.UI.Controls
+             components = new System.ComponentModel.Container();
+             _lblQuickConnect = new ToolStripLabel();
+             _cmbQuickConnect = new QuickConnectComboBox();
+-            _btnQuickConnect = new ToolStripSplitButton();
++            _btnQuickConnect = new ToolStripDropDownButton();
++            _connectButton = new Button
++            {
++                Name = "workspaceConnectButton",
++                AutoSize = true,
++                AutoSizeMode = AutoSizeMode.GrowAndShrink,
++                MinimumSize = new Size(0, 31),
++                FlatStyle = FlatStyle.Flat,
++                Padding = new Padding(9, 3, 9, 3),
++                UseVisualStyleBackColor = false
++            };
++            _connectButton.Click += btnQuickConnect_ButtonClick;
++            var connectHost = new ToolStripControlHost(_connectButton) { Margin = new Padding(5, 1, 6, 1) };
              _mnuQuickConnectProtocol = new ContextMenuStrip(components);
              _btnConnections = new ToolStripDropDownButton();
              _mnuConnections = new ContextMenuStrip(components);
@@ -404,7 +619,14 @@ index 029b13c..7422e94 100644
              SuspendLayout();
              //
              //Theming support
-@@ -70,9 +73,10 @@ namespace mRemoteNG.UI.Controls
+@@ -63,16 +80,17 @@ namespace mRemoteNG.UI.Controls
+             // 
+             _lblQuickConnect.Name = "lblQuickConnect";
+             _lblQuickConnect.Size = new System.Drawing.Size(55, 22);
+-            _lblQuickConnect.Text = Language.strLabelConnect;
+             _lblQuickConnect.Click += lblQuickConnect_Click;
+             // 
+             // cmbQuickConnect
              // 
              _cmbQuickConnect.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
              _cmbQuickConnect.AutoCompleteSource = AutoCompleteSource.ListItems;
@@ -414,56 +636,115 @@ index 029b13c..7422e94 100644
              _cmbQuickConnect.Name = "cmbQuickConnect";
 -            _cmbQuickConnect.Size = new System.Drawing.Size(200, 25);
 +            _cmbQuickConnect.Size = new System.Drawing.Size(208, 25);
++            _cmbQuickConnect.ComboBox.HandleCreated += (sender, e) => ApplyAddressCue();
              _cmbQuickConnect.ConnectRequested += cmbQuickConnect_ConnectRequested;
              _cmbQuickConnect.ProtocolChanged += cmbQuickConnect_ProtocolChanged;
              // 
-@@ -85,7 +89,8 @@ namespace mRemoteNG.UI.Controls
+@@ -83,9 +101,11 @@ namespace mRemoteNG.UI.Controls
+             _lblQuickConnect,
+             _cmbQuickConnect,
              _btnQuickConnect,
++            connectHost,
              _btnConnections});
              Location = new System.Drawing.Point(3, 24);
 -            MaximumSize = new System.Drawing.Size(0, 25);
 +            Font = new System.Drawing.Font("Segoe UI", 9F);
-+            Padding = new Padding(5, 3, 6, 3);
++            Padding = new Padding(8, 7, 8, 7);
              Name = "tsQuickConnect";
              Size = new System.Drawing.Size(387, 25);
              TabIndex = 18;
-@@ -96,6 +101,7 @@ namespace mRemoteNG.UI.Controls
-             _btnQuickConnect.Image = Resources.Play_Quick;
-             _btnQuickConnect.ImageTransparentColor = System.Drawing.Color.Magenta;
+@@ -93,13 +113,10 @@ namespace mRemoteNG.UI.Controls
+             // btnQuickConnect
+             // 
+             _btnQuickConnect.DropDown = _mnuQuickConnectProtocol;
+-            _btnQuickConnect.Image = Resources.Play_Quick;
+-            _btnQuickConnect.ImageTransparentColor = System.Drawing.Color.Magenta;
              _btnQuickConnect.Margin = new Padding(0, 1, 3, 2);
 +            _btnQuickConnect.Padding = new Padding(6, 2, 6, 2);
              _btnQuickConnect.Name = "btnQuickConnect";
-             _btnQuickConnect.Size = new System.Drawing.Size(84, 22);
-             _btnQuickConnect.Text = Language.strMenuConnect;
-@@ -153,7 +159,7 @@ namespace mRemoteNG.UI.Controls
+-            _btnQuickConnect.Size = new System.Drawing.Size(84, 22);
+-            _btnQuickConnect.Text = Language.strMenuConnect;
+-            _btnQuickConnect.ButtonClick += btnQuickConnect_ButtonClick;
++            _btnQuickConnect.DisplayStyle = ToolStripItemDisplayStyle.Text;
+             _btnQuickConnect.DropDownItemClicked += btnQuickConnect_DropDownItemClicked;
+             // 
+             // mnuQuickConnectProtocol
+@@ -128,16 +145,43 @@ namespace mRemoteNG.UI.Controls
+             _mnuConnections.OwnerItem = _btnConnections;
+             _mnuConnections.Size = new System.Drawing.Size(61, 4);
+ 
++            ApplyLanguage();
+             ResumeLayout();
+         }
+ 
+-        private void ApplyTheme()
++        internal void ApplyLanguage()
++        {
++            _lblQuickConnect.Text = Language.strQuickConnect;
++            _connectButton.Text = Language.strMenuConnect.Replace("&", string.Empty);
++            _cmbQuickConnect.AccessibleName = Language.strColumnHostnameIP;
++            if (_cmbQuickConnect.ComboBox.IsHandleCreated)
++                ApplyAddressCue();
++        }
++
++        private void ApplyAddressCue()
+         {
+-            if (!_themeManager.ThemingActive) return;
+-            vsToolStripExtender.SetStyle(_mnuQuickConnectProtocol, _themeManager.ActiveTheme.Version, _themeManager.ActiveTheme.Theme);
+-            vsToolStripExtender.SetStyle(_mnuConnections, _themeManager.ActiveTheme.Version, _themeManager.ActiveTheme.Theme);
+-            _cmbQuickConnect.BackColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("TextBox_Background");
+-            _cmbQuickConnect.ForeColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("TextBox_Foreground");
++            const uint setComboBoxCueBanner = 0x1703;
++            NativeMethods.SendMessage(_cmbQuickConnect.ComboBox.Handle, setComboBoxCueBanner, IntPtr.Zero, Language.strColumnHostnameIP);
++        }
++
++        internal void ApplyTheme()
++        {
++            var theme = _themeManager.ThemingActive && !SystemInformation.HighContrast ? _themeManager.ActiveTheme : null;
++            var palette = theme?.ExtendedPalette;
++            if (theme != null)
++            {
++                vsToolStripExtender.SetStyle(_mnuQuickConnectProtocol, theme.Version, theme.Theme);
++                vsToolStripExtender.SetStyle(_mnuConnections, theme.Version, theme.Theme);
++            }
++            _cmbQuickConnect.BackColor = palette?.getColor("TextBox_Background") ?? SystemColors.Window;
++            _cmbQuickConnect.ForeColor = palette?.getColor("TextBox_Foreground") ?? SystemColors.WindowText;
++            _lblQuickConnect.ForeColor = palette?.getColor("List_Header_Foreground") ?? SystemColors.ControlText;
++            bool workspace = string.Equals(theme?.Name, "Workspace", StringComparison.OrdinalIgnoreCase);
++            _connectButton.BackColor = workspace ? Color.FromArgb(146, 181, 255) : SystemColors.Control;
++            _connectButton.ForeColor = workspace ? Color.FromArgb(20, 35, 59) : SystemColors.ControlText;
++            _connectButton.FlatAppearance.BorderColor = workspace ? Color.FromArgb(118, 162, 255) : SystemColors.ControlDark;
++            _connectButton.FlatAppearance.MouseOverBackColor = workspace ? Color.FromArgb(175, 201, 255) : SystemColors.ControlLight;
++            _connectButton.FlatAppearance.MouseDownBackColor = workspace ? Color.FromArgb(118, 162, 255) : SystemColors.ControlDark;
+         }
+ 
+         #region Quick Connect
+@@ -153,7 +197,7 @@ namespace mRemoteNG.UI.Controls
                      if (fieldInfo.Name == Settings.Default.QuickConnectProtocol)
                      {
                          menuItem.Checked = true;
 -                        _btnQuickConnect.Text = Settings.Default.QuickConnectProtocol;
-+                        UpdateConnectButtonText(Settings.Default.QuickConnectProtocol);
++                        _btnQuickConnect.Text = fieldInfo.Name;
                      }
                      _mnuQuickConnectProtocol.Items.Add(menuItem);
                  }
-@@ -207,12 +213,17 @@ namespace mRemoteNG.UI.Controls
-         private void SetQuickConnectProtocol(string protocol)
+@@ -201,7 +245,6 @@ namespace mRemoteNG.UI.Controls
+         private void btnQuickConnect_DropDownItemClicked(object sender, ToolStripItemClickedEventArgs e)
          {
-             Settings.Default.QuickConnectProtocol = protocol;
--            _btnQuickConnect.Text = protocol;
-+            UpdateConnectButtonText(protocol);
-             foreach (ToolStripMenuItem menuItem in _mnuQuickConnectProtocol.Items)
-             {
+             SetQuickConnectProtocol(e.ClickedItem.Text);
+-            btnQuickConnect_ButtonClick(this, e);
+         }
+ 
+         private void SetQuickConnectProtocol(string protocol)
+@@ -213,6 +256,7 @@ namespace mRemoteNG.UI.Controls
                  menuItem.Checked = menuItem.Text.Equals(protocol);
              }
          }
 +
-+        private void UpdateConnectButtonText(string protocol)
-+        {
-+            _btnQuickConnect.Text = $"{Language.strMenuConnect.Replace("&", string.Empty)} · {protocol}";
-+        }
          #endregion
  
          #region Connections DropDown
-@@ -265,4 +276,4 @@ namespace mRemoteNG.UI.Controls
+@@ -265,4 +309,4 @@ namespace mRemoteNG.UI.Controls
              }
          }
      }
@@ -471,7 +752,7 @@ index 029b13c..7422e94 100644
 \ No newline at end of file
 +}
 diff --git a/mRemoteV1/UI/Forms/OptionsPages/OptionsPage.cs b/mRemoteV1/UI/Forms/OptionsPages/OptionsPage.cs
-index 63357fd..b63a3b8 100644
+index 63357fd18caaada0f4a7c49d2a9dc2cbaf15726f..b63a3b8c7e0fa5cd88a513fa6d47473da8563e53 100644
 --- a/mRemoteV1/UI/Forms/OptionsPages/OptionsPage.cs
 +++ b/mRemoteV1/UI/Forms/OptionsPages/OptionsPage.cs
 @@ -57,11 +57,20 @@ namespace mRemoteNG.UI.Forms.OptionsPages
@@ -500,7 +781,7 @@ index 63357fd..b63a3b8 100644
          }
      }
 diff --git a/mRemoteV1/UI/Forms/frmMain.Designer.cs b/mRemoteV1/UI/Forms/frmMain.Designer.cs
-index deba634..986722f 100644
+index deba6344b4d34125672c03671d725f79d5cbc5fa..9d00c6b18fb4fbe1feb852eae87d536f12392c81 100644
 --- a/mRemoteV1/UI/Forms/frmMain.Designer.cs
 +++ b/mRemoteV1/UI/Forms/frmMain.Designer.cs
 @@ -51,7 +51,7 @@ namespace mRemoteNG.UI.Forms
@@ -517,7 +798,7 @@ index deba634..986722f 100644
              this.msMain.Anchor = System.Windows.Forms.AnchorStyles.Left;
              this.msMain.Dock = System.Windows.Forms.DockStyle.None;
 +            this.msMain.Font = new System.Drawing.Font("Segoe UI", 9F);
-+            this.msMain.Padding = new System.Windows.Forms.Padding(8, 4, 8, 4);
++            this.msMain.Padding = new System.Windows.Forms.Padding(12, 10, 8, 10);
              this.msMain.GripMargin = new System.Windows.Forms.Padding(0);
              this.msMain.GripStyle = System.Windows.Forms.ToolStripGripStyle.Visible;
              this.msMain.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -569,10 +850,10 @@ index deba634..986722f 100644
              this._quickConnectToolStrip.Size = new System.Drawing.Size(364, 25);
              this._quickConnectToolStrip.TabIndex = 18;
 diff --git a/mRemoteV1/UI/Forms/frmMain.cs b/mRemoteV1/UI/Forms/frmMain.cs
-index bb21382..56c4e0f 100644
+index bb213821681ad968741c2a33a1b4387ef03659c7..f6955e691ef3c82ba2003fff1189b07276ff3ee1 100644
 --- a/mRemoteV1/UI/Forms/frmMain.cs
 +++ b/mRemoteV1/UI/Forms/frmMain.cs
-@@ -58,6 +58,10 @@ namespace mRemoteNG.UI.Forms
+@@ -58,12 +58,15 @@ namespace mRemoteNG.UI.Forms
  		{
  			_showFullPathInTitle = Settings.Default.ShowCompleteConsPathInTitle;
  			InitializeComponent();
@@ -583,28 +864,122 @@ index bb21382..56c4e0f 100644
              Fullscreen = new FullscreenHandler(this);
  
              //Theming support
-@@ -624,16 +628,35 @@ namespace mRemoteNG.UI.Forms
+             _themeManager = ThemeManager.getInstance();
+             vsToolStripExtender.DefaultRenderer = _toolStripProfessionalRenderer;
+-            ApplyTheme();
+ 
+             _screenSystemMenu = new ScreenSelectionSystemMenu(this);
+         }
+@@ -142,6 +145,8 @@ namespace mRemoteNG.UI.Forms
+             msMain.Location = Point.Empty;
+             var settingsLoader = new SettingsLoader(this, messageCollector, _quickConnectToolStrip, _externalToolsToolStrip, _multiSshToolStrip, msMain);
+             settingsLoader.LoadSettings();
++            SelectWorkspaceThemeOnFirstLayout();
++            ApplyTheme();
+ 
+             SetMenuDependencies();
+ 
+@@ -176,6 +181,8 @@ namespace mRemoteNG.UI.Forms
+             _screenSystemMenu.BuildScreenList();
+ 			SystemEvents.DisplaySettingsChanged += _screenSystemMenu.OnDisplayChanged;
+             ApplyLanguage();
++            if (!SettingsFileInfo.HasWorkspaceLayout && _quickConnectToolStrip.Visible)
++                PlaceWorkspaceQuickConnect();
+ 
+             Opacity = 1;
+             //Fix missing general panel at the first run
+@@ -197,6 +204,7 @@ namespace mRemoteNG.UI.Forms
+             viewMenu.ApplyLanguage();
+             toolsMenu.ApplyLanguage();
+             helpMenu.ApplyLanguage();
++            _quickConnectToolStrip.ApplyLanguage();
+         }
+ 
+         private void OnApplicationSettingChanged(object sender, PropertyChangedEventArgs propertyChangedEventArgs)
+@@ -249,9 +257,40 @@ namespace mRemoteNG.UI.Forms
+             _quickConnectToolStrip.ConnectionInitiator = connectionInitiator;
+         }
+ 
+-        //Theming support
++        private void SelectWorkspaceThemeOnFirstLayout()
++        {
++            if (SettingsFileInfo.HasWorkspaceLayout || !_themeManager.ThemingActive)
++                return;
++
++            string themeName = Settings.Default.ThemeName;
++            if (!string.Equals(themeName, "darcula", StringComparison.OrdinalIgnoreCase) &&
++                !string.Equals(themeName, "Workspace Dark", StringComparison.OrdinalIgnoreCase) &&
++                !string.Equals(themeName, "Workspace-Dark", StringComparison.OrdinalIgnoreCase))
++                return;
++
++            var workspaceTheme = _themeManager.getTheme("Workspace");
++            if (workspaceTheme != null)
++                _themeManager.ActiveTheme = workspaceTheme;
++        }
++
++        protected override void OnHandleCreated(EventArgs e)
++        {
++            base.OnHandleCreated(e);
++            ApplyCaptionTheme();
++        }
++
++        private void ApplyCaptionTheme()
++        {
++            if (!IsHandleCreated || _themeManager == null) return;
++
++            bool dark = _themeManager.ThemingActive && !SystemInformation.HighContrast &&
++                        _themeManager.ActiveTheme.ExtendedPalette.getColor("Dialog_Background").GetBrightness() < 0.5f;
++            NativeMethods.SetDarkWindowCaption(Handle, dark);
++        }
++
+         private void ApplyTheme()
+ 		{
++            ApplyCaptionTheme();
+ 		    if (!_themeManager.ThemingActive) return;
+ 
+ 		    try
+@@ -272,7 +311,11 @@ namespace mRemoteNG.UI.Forms
+ 		        vsToolStripExtender.SetStyle(_quickConnectToolStrip, _themeManager.ActiveTheme.Version, _themeManager.ActiveTheme.Theme);
+ 		        vsToolStripExtender.SetStyle(_externalToolsToolStrip, _themeManager.ActiveTheme.Version, _themeManager.ActiveTheme.Theme);
+ 		        vsToolStripExtender.SetStyle(_multiSshToolStrip, _themeManager.ActiveTheme.Version, _themeManager.ActiveTheme.Theme);
+-		        tsContainer.TopToolStripPanel.BackColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("CommandBarMenuDefault_Background");
++                var headerBackground = _themeManager.ActiveTheme.ExtendedPalette.getColor("CommandBarMenuDefault_Background");
++		        tsContainer.TopToolStripPanel.BackColor = headerBackground;
++                msMain.BackColor = headerBackground;
++                _quickConnectToolStrip.BackColor = headerBackground;
++		        _quickConnectToolStrip.ApplyTheme();
+ 		        BackColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("Dialog_Background");
+ 		        ForeColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("Dialog_Foreground");
+ 		    }
+@@ -622,18 +665,42 @@ namespace mRemoteNG.UI.Forms
+         #endregion
+ 		
          #region Screen Stuff
++        internal void PlaceWorkspaceQuickConnect()
++        {
++            var toolbarPanel = tsContainer.TopToolStripPanel;
++            _quickConnectToolStrip.Parent?.Controls.Remove(_quickConnectToolStrip);
++            int menuRight = Math.Max(msMain.Right, msMain.Left + msMain.GetPreferredSize(Size.Empty).Width);
++            int quickConnectLeft = menuRight + 14;
++            int quickConnectWidth = _quickConnectToolStrip.GetPreferredSize(Size.Empty).Width;
++            var toolbarLocation = quickConnectLeft + quickConnectWidth <= toolbarPanel.ClientSize.Width
++                ? new Point(quickConnectLeft, msMain.Top)
++                : new Point(msMain.Left, msMain.Bottom);
++            toolbarPanel.Join(_quickConnectToolStrip, toolbarLocation);
++        }
++
          public void SetDefaultLayout()
          {
-+            var toolbarPanel = tsContainer.TopToolStripPanel;
-+            if (_quickConnectToolStrip.Visible && _quickConnectToolStrip.Parent == toolbarPanel)
-+            {
-+                int quickConnectLeft = msMain.Right + 8;
-+                int quickConnectWidth = _quickConnectToolStrip.GetPreferredSize(Size.Empty).Width;
-+                var toolbarLocation = quickConnectLeft + quickConnectWidth <= toolbarPanel.ClientSize.Width
-+                    ? new Point(quickConnectLeft, msMain.Top)
-+                    : new Point(msMain.Left, msMain.Bottom);
-+                toolbarPanel.Join(_quickConnectToolStrip, toolbarLocation);
-+            }
++            if (_quickConnectToolStrip.Visible && _quickConnectToolStrip.Parent == tsContainer.TopToolStripPanel)
++                PlaceWorkspaceQuickConnect();
 +
              pnlDock.Visible = false;
  
 -            pnlDock.DockLeftPortion = pnlDock.Width * 0.2;
 -            pnlDock.DockRightPortion = pnlDock.Width * 0.2;
 +            bool useSideBySidePanels = pnlDock.ClientSize.Width >= 900;
-+            pnlDock.DockLeftPortion = Math.Max(1, Math.Min(276, pnlDock.Width * (useSideBySidePanels ? 0.25 : 0.4)));
-+            pnlDock.DockRightPortion = Math.Max(1, Math.Min(350, pnlDock.Width * 0.35));
++            pnlDock.DockLeftPortion = Math.Max(1, Math.Min(252, pnlDock.Width * (useSideBySidePanels ? 0.28 : 0.4)));
++            pnlDock.DockRightPortion = Math.Max(1, Math.Min(338, pnlDock.Width * 0.38));
              pnlDock.DockTopPortion = pnlDock.Height * 0.25;
              pnlDock.DockBottomPortion = pnlDock.Height * 0.25;
  
@@ -623,7 +998,7 @@ index bb21382..56c4e0f 100644
              Windows.ErrorsForm.Show( pnlDock, DockState.DockBottomAutoHide );  
              Windows.ScreenshotForm.Hide(); 
  
-@@ -660,4 +683,4 @@ namespace mRemoteNG.UI.Forms
+@@ -660,4 +727,4 @@ namespace mRemoteNG.UI.Forms
              fileMenu.mMenFile_DropDownOpening(sender, e);
          }
      }
@@ -631,7 +1006,7 @@ index bb21382..56c4e0f 100644
 \ No newline at end of file
 +}
 diff --git a/mRemoteV1/UI/Forms/frmOptions.Designer.cs b/mRemoteV1/UI/Forms/frmOptions.Designer.cs
-index 5b9bbd6..8b54b19 100644
+index 5b9bbd6e0ddbdaa8692c51e5ff4d1c574a64226d..8b54b1901704990dc2cb7f15ffbf9d5199ffaac3 100644
 --- a/mRemoteV1/UI/Forms/frmOptions.Designer.cs
 +++ b/mRemoteV1/UI/Forms/frmOptions.Designer.cs
 @@ -48,16 +48,16 @@
@@ -727,7 +1102,7 @@ index 5b9bbd6..8b54b19 100644
              this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
              this.Text = "mRemoteNG Options";
 diff --git a/mRemoteV1/UI/Forms/frmOptions.cs b/mRemoteV1/UI/Forms/frmOptions.cs
-index a613469..3513278 100644
+index a613469f7d9e62ead1fbcd409cd42bf0945c9a06..3513278efd9f3c38e3d50e9ac39f2ae9a2b02a5c 100644
 --- a/mRemoteV1/UI/Forms/frmOptions.cs
 +++ b/mRemoteV1/UI/Forms/frmOptions.cs
 @@ -2,6 +2,7 @@
@@ -767,7 +1142,7 @@ index a613469..3513278 100644
          private void ApplyLanguage()
 diff --git a/mRemoteV1/UI/Menu/WorkspaceMenuStyle.cs b/mRemoteV1/UI/Menu/WorkspaceMenuStyle.cs
 new file mode 100644
-index 0000000..b44d470
+index 0000000000000000000000000000000000000000..b44d47018457fb68f240a4fe0eb294e7dccb2a6d
 --- /dev/null
 +++ b/mRemoteV1/UI/Menu/WorkspaceMenuStyle.cs
 @@ -0,0 +1,42 @@
@@ -814,18 +1189,29 @@ index 0000000..b44d470
 +    }
 +}
 diff --git a/mRemoteV1/UI/Window/ConfigWindow.cs b/mRemoteV1/UI/Window/ConfigWindow.cs
-index f6591cc..fc69f32 100644
+index f6591cca6dc10f4c1808c497a7cf2a4506544cf1..7695b0396e82c6df8f18f41dbbbf199b8e5b04ab 100644
 --- a/mRemoteV1/UI/Window/ConfigWindow.cs
 +++ b/mRemoteV1/UI/Window/ConfigWindow.cs
-@@ -42,6 +42,7 @@ namespace mRemoteNG.UI.Window
+@@ -41,7 +41,11 @@ namespace mRemoteNG.UI.Window
+         private ToolStripMenuItem _propertyGridContextMenuReset;
          private ToolStripSeparator _toolStripSeparator1;
          private FilteredPropertyGrid _pGrid;
++        private Panel _selectionHeader;
++        private Label _selectionName;
++        private Label _selectionProtocol;
          private ThemeManager _themeManager;
 +        private VisualStudioToolStripExtender _toolStripExtender;
  
          private AbstractConnectionRecord _selectedTreeNode;
          public AbstractConnectionRecord SelectedTreeNode
-@@ -57,6 +58,7 @@ namespace mRemoteNG.UI.Window
+@@ -51,12 +55,14 @@ namespace mRemoteNG.UI.Window
+             {
+                 _selectedTreeNode = value;
+                 SetPropertyGridObject(_selectedTreeNode);
++                UpdateSelectionHeader();
+             }
+         }
+ 
          private void InitializeComponent()
  		{
              _components = new System.ComponentModel.Container();
@@ -833,7 +1219,7 @@ index f6591cc..fc69f32 100644
              Load += Config_Load;
              SystemColorsChanged += Config_SystemColorsChanged;
              _pGrid = new FilteredPropertyGrid();
-@@ -83,23 +85,23 @@ namespace mRemoteNG.UI.Window
+@@ -83,23 +89,23 @@ namespace mRemoteNG.UI.Window
              _btnHostStatus = new ToolStripButton();
              _btnHostStatus.Click += btnHostStatus_Click;
              CMenIcons = new ContextMenuStrip(_components);
@@ -851,7 +1237,7 @@ index f6591cc..fc69f32 100644
              _pGrid.BrowsableProperties = null;
              _pGrid.ContextMenuStrip = PropertyGridContextMenu;
 -            _pGrid.Font = new Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, Convert.ToByte(0));
-+            _pGrid.Font = new Font("Segoe UI", 9F);
++            _pGrid.Font = new Font("Segoe UI", 9.5F);
              _pGrid.HiddenAttributes = null;
              _pGrid.HiddenProperties = null;
              _pGrid.Location = new Point(0, 0);
@@ -862,7 +1248,7 @@ index f6591cc..fc69f32 100644
              _pGrid.TabIndex = 0;
              _pGrid.UseCompatibleTextRendering = true;
              //
-@@ -191,9 +193,9 @@ namespace mRemoteNG.UI.Window
+@@ -191,9 +197,34 @@ namespace mRemoteNG.UI.Window
              //
              //Config
              //
@@ -870,11 +1256,53 @@ index f6591cc..fc69f32 100644
 +            ClientSize = new Size(340, 530);
              Controls.Add(_pGrid);
 -            Font = new Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, Convert.ToByte(0));
++            _selectionHeader = new Panel
++            {
++                Name = "workspaceSelectionHeader",
++                Dock = DockStyle.Top,
++                Height = 42,
++                Padding = new Padding(13, 7, 12, 7),
++                Visible = false
++            };
++            _selectionName = new Label
++            {
++                Dock = DockStyle.Fill,
++                AutoEllipsis = true,
++                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
++                TextAlign = ContentAlignment.MiddleLeft
++            };
++            _selectionProtocol = new Label
++            {
++                Dock = DockStyle.Right,
++                Width = 68,
++                Font = new Font("Consolas", 9F, FontStyle.Bold),
++                TextAlign = ContentAlignment.MiddleCenter
++            };
++            _selectionHeader.Controls.Add(_selectionName);
++            _selectionHeader.Controls.Add(_selectionProtocol);
++            Controls.Add(_selectionHeader);
 +            Font = new Font("Segoe UI", 9F);
              HideOnClose = true;
              Icon = Resources.Config_Icon;
              Name = "ConfigWindow";
-@@ -614,22 +616,40 @@ namespace mRemoteNG.UI.Window
+@@ -203,6 +234,16 @@ namespace mRemoteNG.UI.Window
+             ResumeLayout(false);
+ 					
+ 		}
++
++        private void UpdateSelectionHeader()
++        {
++            _selectionName.Text = _selectedTreeNode?.Name ?? string.Empty;
++            var connection = _selectedTreeNode as ConnectionInfo;
++            bool showProtocol = connection != null && !(connection is ContainerInfo);
++            _selectionProtocol.Visible = showProtocol;
++            _selectionProtocol.Text = showProtocol ? connection.Protocol.ToString() : string.Empty;
++            _selectionHeader.Visible = !string.IsNullOrWhiteSpace(_selectionName.Text);
++        }
+ 		
+         #region Public Properties
+         public bool PropertiesVisible
+@@ -614,22 +655,44 @@ namespace mRemoteNG.UI.Window
  			_propertyGridContextMenuShowHelpText.Text = Language.strMenuShowHelpText;
  		}
  		
@@ -889,6 +1317,10 @@ index f6591cc..fc69f32 100644
 +            bool useTheme = _themeManager.ThemingActive && !SystemInformation.HighContrast;
 +            var theme = useTheme ? _themeManager.ActiveTheme : null;
 +            var palette = theme?.ExtendedPalette;
++            _selectionHeader.BackColor = palette?.getColor("CommandBarMenuDefault_Background") ?? SystemColors.Control;
++            _selectionName.ForeColor = palette?.getColor("Dialog_Foreground") ?? SystemColors.ControlText;
++            _selectionProtocol.BackColor = palette?.getColor("TextBox_Background") ?? SystemColors.Control;
++            _selectionProtocol.ForeColor = palette?.getColor("List_Header_Foreground") ?? SystemColors.ControlText;
 +            _pGrid.BackColor = palette?.getColor("CommandBarMenuDefault_Background") ?? SystemColors.Control;
 +            _pGrid.ForeColor = palette?.getColor("Dialog_Foreground") ?? SystemColors.ControlText;
 +            _pGrid.ViewBackColor = palette?.getColor("List_Item_Background") ?? SystemColors.Window;
@@ -929,7 +1361,7 @@ index f6591cc..fc69f32 100644
          }
  
          private void AddToolStripItems()
-@@ -688,15 +708,16 @@ namespace mRemoteNG.UI.Window
+@@ -688,15 +751,16 @@ namespace mRemoteNG.UI.Window
  			ApplyLanguage();
              _themeManager = ThemeManager.getInstance();
              _themeManager.ThemeChanged += ApplyTheme;
@@ -951,7 +1383,15 @@ index f6591cc..fc69f32 100644
  		
  		private void pGrid_PropertyValueChanged(object s, PropertyValueChangedEventArgs e)
  		{
-@@ -1680,4 +1701,4 @@ namespace mRemoteNG.UI.Window
+@@ -706,6 +770,7 @@ namespace mRemoteNG.UI.Window
+                 UpdateRootInfoNode(e);
+                 UpdateInheritanceNode();
+                 ShowHideGridItems();
++                UpdateSelectionHeader();
+             }
+             catch (Exception ex)
+ 			{
+@@ -1680,4 +1745,4 @@ namespace mRemoteNG.UI.Window
          }
          #endregion
      }
@@ -959,7 +1399,7 @@ index f6591cc..fc69f32 100644
 \ No newline at end of file
 +}
 diff --git a/mRemoteV1/UI/Window/ConnectionTreeWindow.Designer.cs b/mRemoteV1/UI/Window/ConnectionTreeWindow.Designer.cs
-index 034e6e6..199da85 100644
+index 034e6e6b8dbe86447f75b7c85f4d1719100ff4e7..199da855fff5240e54e723ef8738e508f45a671a 100644
 --- a/mRemoteV1/UI/Window/ConnectionTreeWindow.Designer.cs
 +++ b/mRemoteV1/UI/Window/ConnectionTreeWindow.Designer.cs
 @@ -27,6 +27,7 @@ namespace mRemoteNG.UI.Window
@@ -1075,7 +1515,7 @@ index 034e6e6..199da85 100644
      }
  }
 diff --git a/mRemoteV1/UI/Window/ConnectionTreeWindow.cs b/mRemoteV1/UI/Window/ConnectionTreeWindow.cs
-index e5976d1..fa34079 100644
+index e5976d13623cc90d5323f4790b9c3d4935658632..32742b50b7818f44f0120eef53c08a11d6cd9cd6 100644
 --- a/mRemoteV1/UI/Window/ConnectionTreeWindow.cs
 +++ b/mRemoteV1/UI/Window/ConnectionTreeWindow.cs
 @@ -5,6 +5,7 @@ using mRemoteNG.Themes;
@@ -1086,7 +1526,60 @@ index e5976d1..fa34079 100644
  using System;
  using System.Collections.Generic;
  using System.ComponentModel;
-@@ -60,12 +61,9 @@ namespace mRemoteNG.UI.Window
+@@ -38,11 +39,52 @@ namespace mRemoteNG.UI.Window
+ 			WindowType = WindowType.Tree;
+ 			DockPnl = panel;
+ 			InitializeComponent();
++            InitializeWorkspaceSearch();
+ 			SetMenuEventHandlers();
+ 		    SetConnectionTreeEventHandlers();
+ 		    Settings.Default.PropertyChanged += OnAppSettingsChanged;
+         }
+ 
++        private Button _searchAction;
++        private bool HasSearchQuery => !string.IsNullOrWhiteSpace(txtSearch.Text) && txtSearch.Text != Language.strSearchPrompt;
++
++        private void InitializeWorkspaceSearch()
++        {
++            _searchAction = new Button
++            {
++                Name = "workspaceSearchAction",
++                Text = "Ctrl+F",
++                AccessibleName = Language.strSearchPrompt,
++                Anchor = AnchorStyles.Top | AnchorStyles.Right,
++                Location = new Point(searchBar.Width - 60, 5),
++                Size = new Size(50, 24),
++                FlatStyle = FlatStyle.Flat,
++                TabStop = false
++            };
++            _searchAction.FlatAppearance.BorderSize = 0;
++            _searchAction.Click += (sender, args) =>
++            {
++                txtSearch.Focus();
++                if (HasSearchQuery) txtSearch.Clear();
++            };
++            txtSearch.TextChanged += (sender, args) => _searchAction.Text = HasSearchQuery ? "×" : "Ctrl+F";
++            txtSearch.Width = Math.Max(1, _searchAction.Left - txtSearch.Left - 4);
++            searchBar.Controls.Add(_searchAction);
++            searchBar.Paint += PaintWorkspaceSearch;
++        }
++
++        private void PaintWorkspaceSearch(object sender, PaintEventArgs e)
++        {
++            if (_themeManager == null || !_themeManager.ThemingActive || SystemInformation.HighContrast || searchBar.Width < 18)
++                return;
++
++            var box = new Rectangle(7, 3, searchBar.Width - 15, searchBar.Height - 7);
++            using (var fill = new SolidBrush(txtSearch.BackColor))
++                e.Graphics.FillRectangle(fill, box);
++            using (var border = new Pen(_themeManager.ActiveTheme.ExtendedPalette.getColor("TextBox_Border")))
++                e.Graphics.DrawRectangle(border, box);
++        }
++
+ 	    private void OnAppSettingsChanged(object o, PropertyChangedEventArgs propertyChangedEventArgs)
+ 	    {
+ 	        if (propertyChangedEventArgs.PropertyName == nameof(Settings.UseFilterSearch))
+@@ -60,12 +102,9 @@ namespace mRemoteNG.UI.Window
              //work on the theme change
              _themeManager = ThemeManager.getInstance();
              _themeManager.ThemeChanged += ApplyTheme;
@@ -1101,23 +1594,137 @@ index e5976d1..fa34079 100644
          }
  
          private void ApplyLanguage()
-@@ -97,6 +95,7 @@ namespace mRemoteNG.UI.Window
+@@ -97,7 +136,12 @@ namespace mRemoteNG.UI.Window
              olvConnections.UnfocusedSelectedForeColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("Treeview_SelectedItem_Inactive_Foreground");
              //There is a border around txtSearch that dont theme well
              txtSearch.BackColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("TextBox_Background");
-+            searchBar.BackColor = txtSearch.BackColor;
++            searchBar.BackColor = olvConnections.BackColor;
++            PictureBox1.BackColor = txtSearch.BackColor;
++            _searchAction.BackColor = txtSearch.BackColor;
++            _searchAction.ForeColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("List_Header_Foreground");
              txtSearch.ForeColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("TextBox_Foreground");
++            searchBar.Invalidate();
          }
          #endregion
-@@ -319,4 +318,4 @@ namespace mRemoteNG.UI.Window
+ 
+@@ -319,4 +363,4 @@ namespace mRemoteNG.UI.Window
  		}
          #endregion
  	}
 -}
 \ No newline at end of file
 +}
+diff --git a/mRemoteV1/UI/Window/ConnectionWindow.Designer.cs b/mRemoteV1/UI/Window/ConnectionWindow.Designer.cs
+index 08a0ef4ab29de5fa5462e425c556a91440a052a3..c037d35952101d55457666d0edd4ecd3cc0f114b 100644
+--- a/mRemoteV1/UI/Window/ConnectionWindow.Designer.cs
++++ b/mRemoteV1/UI/Window/ConnectionWindow.Designer.cs
+@@ -34,7 +34,7 @@ namespace mRemoteNG.UI.Window
+         {
+             components = new System.ComponentModel.Container();
+             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(ConnectionWindow));
+-            TabController = new TabControl();
++            TabController = new WorkspaceSessionTabs();
+             cmenTab = new ContextMenuStrip(components);
+             cmenTabFullscreen = new ToolStripMenuItem();
+             cmenTabSmartSize = new ToolStripMenuItem();
+@@ -233,4 +233,4 @@ namespace mRemoteNG.UI.Window
+             ResumeLayout(false);
+         }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/mRemoteV1/UI/Window/ConnectionWindow.cs b/mRemoteV1/UI/Window/ConnectionWindow.cs
+index 1b0a94128dc1b9f614790d4fb58289e242006f6a..821f6e8fa6f51d1f7f16d6f8805c64744636ca36 100644
+--- a/mRemoteV1/UI/Window/ConnectionWindow.cs
++++ b/mRemoteV1/UI/Window/ConnectionWindow.cs
+@@ -31,6 +31,41 @@ namespace mRemoteNG.UI.Window
+         private VisualStudioToolStripExtender vsToolStripExtender;
+         private readonly ToolStripRenderer _toolStripProfessionalRenderer = new ToolStripProfessionalRenderer();
+ 
++        private sealed class WorkspaceSessionTabs : TabControl
++        {
++            internal bool UseWorkspacePalette { get; set; }
++
++            protected override void OnPaintBackground(PaintEventArgs e)
++            {
++                base.OnPaintBackground(e);
++                if (!UseWorkspacePalette) return;
++                using (var fill = new SolidBrush(Color.FromArgb(27, 34, 48)))
++                    e.Graphics.FillRectangle(fill, TabsAreaRect);
++            }
++
++            protected override void DrawTabBorder(ref Rectangle rectTab, TabPage page, Graphics graphics)
++            {
++                if (!UseWorkspacePalette)
++                {
++                    base.DrawTabBorder(ref rectTab, page, graphics);
++                    return;
++                }
++
++                if (rectTab.Width < 3 || rectTab.Height < 3) return;
++                var bounds = new Rectangle(rectTab.X + 1, rectTab.Y + 1, rectTab.Width - 2, rectTab.Height - 1);
++                bool selected = ReferenceEquals(page, SelectedTab);
++                using (var fill = new SolidBrush(selected ? Color.FromArgb(18, 23, 34) : Color.FromArgb(23, 28, 38)))
++                    graphics.FillRectangle(fill, bounds);
++                using (var border = new Pen(Color.FromArgb(43, 53, 72)))
++                    graphics.DrawRectangle(border, bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1);
++                if (selected)
++                {
++                    using (var accent = new SolidBrush(Color.FromArgb(118, 162, 255)))
++                        graphics.FillRectangle(accent, bounds.Left + 1, bounds.Top, bounds.Width - 2, 2);
++                }
++            }
++        }
++
+         #region Public Methods
+         public ConnectionWindow(DockContent panel, string formText = "")
+         {
+@@ -175,16 +210,28 @@ namespace mRemoteNG.UI.Window
+ 
+         private new void ApplyTheme()
+         {
+-            if(ThemeManager.getInstance().ThemingActive)
++            var themeManager = ThemeManager.getInstance();
++            var theme = themeManager.ThemingActive && !SystemInformation.HighContrast ? themeManager.ActiveTheme : null;
++            var workspaceTabs = TabController as WorkspaceSessionTabs;
++            bool workspace = string.Equals(theme?.Name, "Workspace", StringComparison.OrdinalIgnoreCase);
++            if (workspaceTabs != null)
++                workspaceTabs.UseWorkspacePalette = workspace;
++            if (theme != null)
+             {
+                 base.ApplyTheme();
+-                this.vsToolStripExtender = new WeifenLuo.WinFormsUI.Docking.VisualStudioToolStripExtender(this.components);
+-                vsToolStripExtender.DefaultRenderer = _toolStripProfessionalRenderer;
+-                vsToolStripExtender.SetStyle(cmenTab, ThemeManager.getInstance().ActiveTheme.Version, ThemeManager.getInstance().ActiveTheme.Theme);
+-                TabController.BackColor = ThemeManager.getInstance().ActiveTheme.ExtendedPalette.getColor("Tab_Item_Background");
+-                TabController.TextColor = ThemeManager.getInstance().ActiveTheme.ExtendedPalette.getColor("Tab_Item_Foreground");
+-                TabController.TextInactiveColor = ThemeManager.getInstance().ActiveTheme.ExtendedPalette.getColor("Tab_Item_Disabled_Foreground");
++                if (vsToolStripExtender == null)
++                {
++                    vsToolStripExtender = new VisualStudioToolStripExtender(components);
++                    vsToolStripExtender.DefaultRenderer = _toolStripProfessionalRenderer;
++                }
++                vsToolStripExtender.SetStyle(cmenTab, theme.Version, theme.Theme);
++                TabController.BackColor = workspace ? Color.FromArgb(27, 34, 48) : theme.ExtendedPalette.getColor("Tab_Item_Background");
++                TabController.TextColor = theme.ExtendedPalette.getColor("Tab_Item_Foreground");
++                TabController.TextInactiveColor = theme.ExtendedPalette.getColor("Tab_Item_Disabled_Foreground");
++                TabController.ButtonActiveColor = TabController.TextColor;
++                TabController.ButtonInactiveColor = TabController.TextInactiveColor;
+             }
++            TabController.Invalidate();
+         }
+ 
+         private bool _documentHandlersAdded;
+@@ -925,4 +972,4 @@ namespace mRemoteNG.UI.Window
+         }
+         #endregion
+     }
+-}
+\ No newline at end of file
++}
 diff --git a/mRemoteV1/app.config b/mRemoteV1/app.config
-index e0a91c6..0dc4f8a 100644
+index e0a91c64ec74afbbfda055ec18714dd86241ed39..ef688e8006b611027ba59459fdd2a530114d11a9 100644
 --- a/mRemoteV1/app.config
 +++ b/mRemoteV1/app.config
 @@ -210,7 +210,7 @@
@@ -1134,7 +1741,7 @@ index e0a91c6..0dc4f8a 100644
        </setting>
        <setting name="ThemeName" serializeAs="String">
 -        <value />
-+        <value>darcula</value>
++        <value>Workspace</value>
        </setting>
        <setting name="ShowConfigHelpText" serializeAs="String">
          <value>True</value>
@@ -1148,7 +1755,7 @@ index e0a91c6..0dc4f8a 100644
        <setting name="ConDefaultUsername" serializeAs="String">
          <value />
 diff --git a/mRemoteV1/mRemoteV1.csproj b/mRemoteV1/mRemoteV1.csproj
-index 8e4f033..5fac83e 100644
+index 8e4f0336885c8912b7f3b432562d7494404096db..5fac83ef3edaacf6a7476c454896dd0b8f3bb277 100644
 --- a/mRemoteV1/mRemoteV1.csproj
 +++ b/mRemoteV1/mRemoteV1.csproj
 @@ -647,6 +647,7 @@

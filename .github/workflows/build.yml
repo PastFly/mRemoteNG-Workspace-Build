@@ -2,8 +2,14 @@ name: Build mRemoteNG 1.76.20 Workspace MSI
 
 on:
   workflow_dispatch:
+    inputs:
+      upgrade_from_run:
+        description: Previous successful run to use in the MSI upgrade test
+        required: false
+        type: string
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -15,13 +21,32 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+      - name: Download the previous installer for the upgrade test
+        if: ${{ inputs.upgrade_from_run != '' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: mRemoteNG-1.76.20-Workspace-x86
+          path: previous-installer
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.upgrade_from_run }}
       - name: Build and inspect the installer
         shell: pwsh
         run: .\Build-WorkspaceMsi.ps1
+      - name: Launch mRemoteNG and verify the layout
+        shell: powershell
+        run: .\Test-WorkspaceUi.ps1
       - name: Store the installer and checksum
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: mRemoteNG-1.76.20-Workspace-x86
           path: dist/*
           if-no-files-found: error
+          retention-days: 14
+      - name: Store the Windows screenshot
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: workspace-windows-screenshot
+          path: visual/*
+          if-no-files-found: ignore
           retention-days: 14
