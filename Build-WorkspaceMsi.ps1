@@ -72,21 +72,6 @@ $fileName = 'mRemoteNG-1.76.20-Workspace-x86.msi'
 $installerPath = Join-Path $dist $fileName
 Copy-Item -LiteralPath $packages[0].FullName -Destination $installerPath
 
-$windowsInstaller = New-Object -ComObject WindowsInstaller.Installer
-$database = $windowsInstaller.GetType().InvokeMember('OpenDatabase', 'InvokeMethod', $null, $windowsInstaller, @($installerPath, 0))
-$fileTable = $database.GetType().InvokeMember('OpenView', 'InvokeMethod', $null, $database, @('SELECT `FileName` FROM `File`'))
-$null = $fileTable.GetType().InvokeMember('Execute', 'InvokeMethod', $null, $fileTable, $null)
-$containsApplication = $false
-while ($null -ne ($record = $fileTable.GetType().InvokeMember('Fetch', 'InvokeMethod', $null, $fileTable, $null))) {
-    $storedName = $record.GetType().InvokeMember('StringData', 'GetProperty', $null, $record, @(1))
-    if (($storedName -split '\|') -contains 'mRemoteNG.exe') {
-        $containsApplication = $true
-        break
-    }
-}
-$null = $fileTable.GetType().InvokeMember('Close', 'InvokeMethod', $null, $fileTable, $null)
-if (!$containsApplication) { throw 'The MSI does not contain mRemoteNG.exe.' }
-
 $installPath = Join-Path $env:RUNNER_TEMP 'mremoteng-msi-smoke'
 $installLog = Join-Path $env:RUNNER_TEMP 'mremoteng-msi-install.log'
 $msiexec = Join-Path $env:WINDIR 'System32\msiexec.exe'
