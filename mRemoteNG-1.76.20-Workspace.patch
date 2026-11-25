@@ -1,0 +1,1168 @@
+diff --git a/mRemoteV1/Properties/Settings.Designer.cs b/mRemoteV1/Properties/Settings.Designer.cs
+index e6dcfb9..e8fc7c8 100644
+--- a/mRemoteV1/Properties/Settings.Designer.cs
++++ b/mRemoteV1/Properties/Settings.Designer.cs
+@@ -721,7 +721,7 @@ namespace mRemoteNG {
+         
+         [global::System.Configuration.UserScopedSettingAttribute()]
+         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+-        [global::System.Configuration.DefaultSettingValueAttribute("3, 24")]
++        [global::System.Configuration.DefaultSettingValueAttribute("240, 0")]
+         public global::System.Drawing.Point QuickyTBLocation {
+             get {
+                 return ((global::System.Drawing.Point)(this["QuickyTBLocation"]));
+@@ -2043,7 +2043,7 @@ namespace mRemoteNG {
+         
+         [global::System.Configuration.UserScopedSettingAttribute()]
+         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+-        [global::System.Configuration.DefaultSettingValueAttribute("")]
++        [global::System.Configuration.DefaultSettingValueAttribute("darcula")]
+         public string ThemeName {
+             get {
+                 return ((string)(this["ThemeName"]));
+@@ -2545,7 +2545,7 @@ namespace mRemoteNG {
+         
+         [global::System.Configuration.UserScopedSettingAttribute()]
+         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
++        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+         public bool ThemingActive {
+             get {
+                 return ((bool)(this["ThemingActive"]));
+diff --git a/mRemoteV1/Properties/Settings.settings b/mRemoteV1/Properties/Settings.settings
+index 3d680b5..9c40aaf 100644
+--- a/mRemoteV1/Properties/Settings.settings
++++ b/mRemoteV1/Properties/Settings.settings
+@@ -177,7 +177,7 @@
+       <Value Profile="(Default)">True</Value>
+     </Setting>
+     <Setting Name="QuickyTBLocation" Type="System.Drawing.Point" Scope="User">
+-      <Value Profile="(Default)">3, 24</Value>
++      <Value Profile="(Default)">240, 0</Value>
+     </Setting>
+     <Setting Name="QuickyTBParentDock" Type="System.String" Scope="User">
+       <Value Profile="(Default)">Top</Value>
+@@ -507,7 +507,7 @@
+       <Value Profile="(Default)">release</Value>
+     </Setting>
+     <Setting Name="ThemeName" Type="System.String" Scope="User">
+-      <Value Profile="(Default)" />
++      <Value Profile="(Default)">darcula</Value>
+     </Setting>
+     <Setting Name="ShowConfigHelpText" Type="System.Boolean" Scope="User">
+       <Value Profile="(Default)">True</Value>
+@@ -633,7 +633,7 @@
+       <Value Profile="(Default)">cs-CZ,de,el,en,en-US,es-AR,es,fr,hu,it,ja-JP,ko-KR,nb-NO,nl,pt,pt-BR,pl,ru,uk,tr-TR,zh-CN,zh-TW</Value>
+     </Setting>
+     <Setting Name="ThemingActive" Type="System.Boolean" Scope="User">
+-      <Value Profile="(Default)">False</Value>
++      <Value Profile="(Default)">True</Value>
+     </Setting>
+     <Setting Name="ConDefaultUsername" Type="System.String" Scope="User">
+       <Value Profile="(Default)" />
+diff --git a/mRemoteV1/Resources/Themes/darcula.vstheme b/mRemoteV1/Resources/Themes/darcula.vstheme
+index 9958fff..61be62a 100644
+--- a/mRemoteV1/Resources/Themes/darcula.vstheme
++++ b/mRemoteV1/Resources/Themes/darcula.vstheme
+@@ -106,15 +106,15 @@
+         <Background Type="CT_RAW" Source="FF1B1B1C" />
+       </Color>
+       <Color Name="TabItem">
+-        <Background Type="CT_RAW" Source="FF252526" />
+-        <Foreground Type="CT_RAW" Source="FFF1F1F1" />
++        <Background Type="CT_RAW" Source="FF202838" />
++        <Foreground Type="CT_RAW" Source="FFF0F5FF" />
+       </Color>
+       <Color Name="TabItemBorder">
+         <Background Type="CT_RAW" Source="FF252526" />
+       </Color>
+       <Color Name="TabItemDisabled">
+-        <Background Type="CT_RAW" Source="FF252526" />
+-        <Foreground Type="CT_RAW" Source="FF5F5F5F" />
++        <Background Type="CT_RAW" Source="FF1B2230" />
++        <Foreground Type="CT_RAW" Source="FFB1BDD0" />
+       </Color>
+       <Color Name="TabItemDisabledBorder">
+         <Background Type="CT_RAW" Source="FF252526" />
+@@ -167,11 +167,11 @@
+         <Background Type="CT_RAW" Source="FF4B6EAF" />
+       </Color>
+       <Color Name="ListItem">
+-        <Background Type="CT_RAW" Source="FF3C3F41" />
+-        <Foreground Type="CT_RAW" Source="FFBBBBBB" />
++        <Background Type="CT_RAW" Source="FF171C26" />
++        <Foreground Type="CT_RAW" Source="FFE9EFFA" />
+       </Color>
+       <Color Name="ListItemBorder">
+-        <Background Type="CT_RAW" Source="FF3C3F41" />
++        <Background Type="CT_RAW" Source="FF2B3548" />
+       </Color>
+       <Color Name="ListItemMouseOver">
+         <Background Type="CT_RAW" Source="FF4B6EAF" />
+@@ -181,15 +181,15 @@
+         <Background Type="CT_RAW" Source="FF4B6EAF" />
+       </Color>
+       <Color Name="ListItemSelected">
+-        <Background Type="CT_RAW" Source="FF4B6EAF" />
+-        <Foreground Type="CT_RAW" Source="FFBBBBBB" />
++        <Background Type="CT_RAW" Source="FF294577" />
++        <Foreground Type="CT_RAW" Source="FFF0F5FF" />
+       </Color>
+       <Color Name="ListItemDisabledBorder">
+         <Background Type="CT_RAW" Source="FF3C3F41" />
+       </Color>
+       <Color Name="ListItemDisabled">
+-        <Background Type="CT_RAW" Source="FF3C3F41" />
+-        <Foreground Type="CT_RAW" Source="FF5F5F5F" />
++        <Background Type="CT_RAW" Source="FF202838" />
++        <Foreground Type="CT_RAW" Source="FFA9B7CC" />
+       </Color>
+       <Color Name="ToggleDisabledBorder">
+         <Background Type="CT_RAW" Source="FF3C3F41" />
+@@ -614,12 +614,12 @@
+         <Foreground Type="CT_RAW" Source="FFFFFFFF" />
+       </Color>
+       <Color Name="ListHeader">
+-        <Background Type="CT_RAW" Source="FF44475A" />
+-        <Foreground Type="CT_RAW" Source="FFF993BD" />
++        <Background Type="CT_RAW" Source="FF1B2230" />
++        <Foreground Type="CT_RAW" Source="FFB1BDD0" />
+       </Color>
+       <Color Name="Dialog">
+-        <Background Type="CT_RAW" Source="FF464A4D" />
+-        <Foreground Type="CT_RAW" Source="FFBBBBBB" />
++        <Background Type="CT_RAW" Source="FF1B2230" />
++        <Foreground Type="CT_RAW" Source="FFE9EFFA" />
+       </Color>
+       <Color Name="DialogBorder">
+         <Background Type="CT_RAW" Source="FFADADAD" />
+@@ -2782,13 +2782,13 @@
+         <Background Type="CT_RAW" Source="FFBBBBBB" />
+       </Color>
+       <Color Name="TextBoxBackground">
+-        <Background Type="CT_RAW" Source="FF343638" />
++        <Background Type="CT_RAW" Source="FF202838" />
+       </Color>
+       <Color Name="TextBoxBorder">
+-        <Background Type="CT_RAW" Source="FF474B4F" />
++        <Background Type="CT_RAW" Source="FF3C4A63" />
+       </Color>
+       <Color Name="TextBoxText">
+-        <Background Type="CT_RAW" Source="FFBBBBBB" />
++        <Background Type="CT_RAW" Source="FFE9EFFA" />
+       </Color>
+       <Color Name="TextBoxBackgroundDisabled">
+         <Background Type="CT_RAW" Source="FF464A4D" />
+@@ -2803,7 +2803,7 @@
+         <Background Type="CT_RAW" Source="FF343638" />
+       </Color>
+       <Color Name="TextBoxBorderFocused">
+-        <Background Type="CT_RAW" Source="FF4B6EAF" />
++        <Background Type="CT_RAW" Source="FF76A2FF" />
+       </Color>
+       <Color Name="TextBoxTextFocused">
+         <Background Type="CT_RAW" Source="FFBBBBBB" />
+@@ -3264,7 +3264,7 @@
+         <Background Type="CT_RAW" Source="FFBBBBBB" />
+       </Color>
+       <Color Name="AutoHideTabBackgroundBegin">
+-        <Background Type="CT_RAW" Source="FF464A4D" />
++        <Background Type="CT_RAW" Source="FF1B2230" />
+       </Color>
+       <Color Name="AutoHideTabBackgroundEnd">
+         <Background Type="CT_RAW" Source="FF464A4D" />
+@@ -3453,22 +3453,22 @@
+         <Background Type="CT_RAW" Source="FFBBBBBB" />
+       </Color>
+       <Color Name="CommandBarMenuBackgroundGradientBegin">
+-        <Background Type="CT_RAW" Source="FF3C3F41" />
++        <Background Type="CT_RAW" Source="FF1B2230" />
+       </Color>
+       <Color Name="CommandBarMenuBackgroundGradientEnd">
+-        <Background Type="CT_RAW" Source="FF3C3F41" />
++        <Background Type="CT_RAW" Source="FF1B2230" />
+       </Color>
+       <Color Name="CommandBarMenuBorder">
+-        <Background Type="CT_RAW" Source="FF2D2D2D" />
++        <Background Type="CT_RAW" Source="FF3C4A63" />
+       </Color>
+       <Color Name="CommandBarMenuIconBackground">
+-        <Background Type="CT_RAW" Source="FF3C3F41" />
++        <Background Type="CT_RAW" Source="FF1B2230" />
+       </Color>
+       <Color Name="CommandBarMenuMouseOverSubmenuGlyph">
+         <Background Type="CT_RAW" Source="FFBBBBBB" />
+       </Color>
+       <Color Name="CommandBarMenuSeparator">
+-        <Background Type="CT_RAW" Source="FF2D2D2D" />
++        <Background Type="CT_RAW" Source="FF2B3548" />
+       </Color>
+       <Color Name="CommandBarMenuSubmenuGlyph">
+         <Background Type="CT_RAW" Source="FFBBBBBB" />
+@@ -3486,7 +3486,7 @@
+         <Background Type="CT_RAW" Source="FF4B6EAF" />
+       </Color>
+       <Color Name="CommandBarMouseOverBackgroundBegin">
+-        <Background Type="CT_RAW" Source="FF505457" />
++        <Background Type="CT_RAW" Source="FF24314A" />
+       </Color>
+       <Color Name="CommandBarMouseOverBackgroundMiddle1">
+         <Background Type="CT_RAW" Source="FF505457" />
+@@ -3531,7 +3531,7 @@
+         <Background Type="CT_RAW" Source="FF464A4D" />
+       </Color>
+       <Color Name="CommandBarToolBarBorder">
+-        <Background Type="CT_RAW" Source="FF464A4D" />
++        <Background Type="CT_RAW" Source="FF2B3548" />
+       </Color>
+       <Color Name="CommandBarToolBarSeparator">
+         <Background Type="CT_RAW" Source="FF505457" />
+@@ -3546,7 +3546,7 @@
+         <Background Type="CT_RAW" Source="FF464A4D" />
+       </Color>
+       <Color Name="CommandShelfHighlightGradientBegin">
+-        <Background Type="CT_RAW" Source="FF464A4D" />
++        <Background Type="CT_RAW" Source="FF1B2230" />
+       </Color>
+       <Color Name="CommandShelfHighlightGradientMiddle">
+         <Background Type="CT_RAW" Source="FF464A4D" />
+@@ -3993,7 +3993,7 @@
+         <Background Type="CT_RAW" Source="FF2D2D30" />
+       </Color>
+       <Color Name="ToolWindowButtonInactiveGlyph">
+-        <Background Type="CT_RAW" Source="FF8C8C8C" />
++        <Background Type="CT_RAW" Source="FFA9B7CC" />
+       </Color>
+       <Color Name="ToolWindowButtonInactive">
+         <Background Type="CT_RAW" Source="00000000" />
+@@ -4008,7 +4008,7 @@
+         <Background Type="CT_RAW" Source="FFDFDFDF" />
+       </Color>
+       <Color Name="ToolWindowButtonActiveGlyph">
+-        <Background Type="CT_RAW" Source="FF8C8C8C" />
++        <Background Type="CT_RAW" Source="FFE9EFFA" />
+       </Color>
+       <Color Name="ToolWindowButtonHoverActiveGlyph">
+         <Background Type="CT_RAW" Source="FFDFDFDF" />
+@@ -4144,13 +4144,13 @@
+         <Background Type="CT_RAW" Source="FF3C3F41" />
+       </Color>
+       <Color Name="CommandBarGradientBegin">
+-        <Background Type="CT_RAW" Source="FF464A4D" />
++        <Background Type="CT_RAW" Source="FF1B2230" />
+       </Color>
+       <Color Name="CommandBarGradientEnd">
+-        <Background Type="CT_RAW" Source="FF464A4D" />
++        <Background Type="CT_RAW" Source="FF1B2230" />
+       </Color>
+       <Color Name="CommandBarGradientMiddle">
+-        <Background Type="CT_RAW" Source="FF464A4D" />
++        <Background Type="CT_RAW" Source="FF1B2230" />
+       </Color>
+       <Color Name="CommandBarHover">
+         <Background Type="CT_RAW" Source="FF4B6EAF" />
+@@ -4171,10 +4171,10 @@
+         <Background Type="CT_RAW" Source="FF2D2D30" />
+       </Color>
+       <Color Name="CommandBarTextActive">
+-        <Background Type="CT_RAW" Source="FFBBBBBB" />
++        <Background Type="CT_RAW" Source="FFE9EFFA" />
+       </Color>
+       <Color Name="CommandBarTextHover">
+-        <Background Type="CT_RAW" Source="FFBBBBBB" />
++        <Background Type="CT_RAW" Source="FFE9EFFA" />
+       </Color>
+       <Color Name="CommandBarTextInactive">
+         <Background Type="CT_RAW" Source="FF5F5F5F" />
+@@ -4264,7 +4264,7 @@
+         <Background Type="CT_RAW" Source="FFF1F1F1" />
+       </Color>
+       <Color Name="EnvironmentBackground">
+-        <Background Type="CT_RAW" Source="FF464A4D" />
++        <Background Type="CT_RAW" Source="FF121722" />
+       </Color>
+       <Color Name="EnvironmentBackgroundGradientBegin">
+         <Background Type="CT_RAW" Source="FF464A4D" />
+@@ -4549,10 +4549,10 @@
+         <Background Type="CT_RAW" Source="FF414C5D" />
+       </Color>
+       <Color Name="TitleBarActiveText">
+-        <Background Type="CT_RAW" Source="FFBBBBBB" />
++        <Background Type="CT_RAW" Source="FFE9EFFA" />
+       </Color>
+       <Color Name="TitleBarInactive">
+-        <Background Type="CT_RAW" Source="FF444749" />
++        <Background Type="CT_RAW" Source="FF1B2230" />
+       </Color>
+       <Color Name="TitleBarInactiveGradientBegin">
+         <Background Type="CT_RAW" Source="FF444749" />
+@@ -4561,7 +4561,7 @@
+         <Background Type="CT_RAW" Source="FF3C3F41" />
+       </Color>
+       <Color Name="TitleBarInactiveText">
+-        <Background Type="CT_RAW" Source="FFBBBBBB" />
++        <Background Type="CT_RAW" Source="FFA9B7CC" />
+       </Color>
+       <Color Name="ToolboxBackground">
+         <Background Type="CT_RAW" Source="FF3C3F41" />
+@@ -4591,7 +4591,7 @@
+         <Background Type="CT_RAW" Source="FF3C3F41" />
+       </Color>
+       <Color Name="ToolWindowBackground">
+-        <Background Type="CT_RAW" Source="FF3C3F41" />
++        <Background Type="CT_RAW" Source="FF171C26" />
+       </Color>
+       <Color Name="ToolWindowBorder">
+         <Background Type="CT_RAW" Source="FF2D2D2D" />
+@@ -4624,7 +4624,7 @@
+         <Background Type="CT_RAW" Source="FF464A4D" />
+       </Color>
+       <Color Name="ToolWindowTabGradientBegin">
+-        <Background Type="CT_RAW" Source="FF464A4D" />
++        <Background Type="CT_RAW" Source="FF1B2230" />
+       </Color>
+       <Color Name="ToolWindowTabGradientEnd">
+         <Background Type="CT_RAW" Source="FF464A4D" />
+@@ -4714,10 +4714,10 @@
+         <Background Type="CT_RAW" Source="FF434346" />
+       </Color>
+       <Color Name="TitleBarActiveBorder">
+-        <Background Type="CT_RAW" Source="FF434F60" />
++        <Background Type="CT_RAW" Source="FF2B3548" />
+       </Color>
+       <Color Name="TitleBarDragHandle">
+-        <Background Type="CT_RAW" Source="FF606466" />
++        <Background Type="CT_RAW" Source="FF52647F" />
+       </Color>
+       <Color Name="ToolWindowFloatingFrameInactive">
+         <Background Type="CT_RAW" Source="FF464A4D" />
+@@ -5188,7 +5188,7 @@
+         <Background Type="CT_RAW" Source="FF464A4D" />
+       </Color>
+       <Color Name="TitleBarDragHandleActive">
+-        <Background Type="CT_RAW" Source="FF5F7087" />
++        <Background Type="CT_RAW" Source="FF62728C" />
+       </Color>
+       <Color Name="FileTabButtonProvisionalHoverGlyph">
+         <Background Type="CT_RAW" Source="FF808080" />
+@@ -5254,11 +5254,11 @@
+         <Background Type="CT_RAW" Source="66FFFFFF" />
+       </Color>
+       <Color Name="CommandBarMenuItemMouseOverBorder">
+-        <Background Type="CT_RAW" Source="FF4B6EAF" />
++        <Background Type="CT_RAW" Source="FF3C4A63" />
+       </Color>
+       <Color Name="CommandBarMenuItemMouseOver">
+-        <Background Type="CT_RAW" Source="FF4B6EAF" />
+-        <Foreground Type="CT_RAW" Source="FFBBBBBB" />
++        <Background Type="CT_RAW" Source="FF24314A" />
++        <Foreground Type="CT_RAW" Source="FFE9EFFA" />
+       </Color>
+       <Color Name="ScrollBarArrowGlyphPressed">
+         <Background Type="CT_RAW" Source="FF6F6F6F" />
+@@ -9391,16 +9391,16 @@
+     </Category>
+     <Category Name="TreeView" GUID="{92ecf08e-8b13-4cf4-99e9-ae2692382185}">
+       <Color Name="Background">
+-        <Background Type="CT_RAW" Source="FF3C3F41" />
+-        <Foreground Type="CT_RAW" Source="FFBBBBBB" />
++        <Background Type="CT_RAW" Source="FF171C26" />
++        <Foreground Type="CT_RAW" Source="FFDCE4F2" />
+       </Color>
+       <Color Name="SelectedItemActive">
+-        <Background Type="CT_RAW" Source="FF4B6EAF" />
+-        <Foreground Type="CT_RAW" Source="FFBBBBBB" />
++        <Background Type="CT_RAW" Source="FF294577" />
++        <Foreground Type="CT_RAW" Source="FFF0F5FF" />
+       </Color>
+       <Color Name="SelectedItemInactive">
+-        <Background Type="CT_RAW" Source="FF0D293E" />
+-        <Foreground Type="CT_RAW" Source="FFBBBBBB" />
++        <Background Type="CT_RAW" Source="FF263550" />
++        <Foreground Type="CT_RAW" Source="FFDCE4F2" />
+       </Color>
+       <Color Name="FocusVisualBorder">
+         <Background Type="CT_RAW" Source="FF4B6EAF" />
+diff --git a/mRemoteV1/UI/Controls/QuickConnectToolStrip.cs b/mRemoteV1/UI/Controls/QuickConnectToolStrip.cs
+index 029b13c..7422e94 100644
+--- a/mRemoteV1/UI/Controls/QuickConnectToolStrip.cs
++++ b/mRemoteV1/UI/Controls/QuickConnectToolStrip.cs
+@@ -8,6 +8,7 @@ using mRemoteNG.Connection.Protocol;
+ using mRemoteNG.Container;
+ using mRemoteNG.Themes;
+ using mRemoteNG.Tools;
++using mRemoteNG.UI.Menu;
+ 
+ namespace mRemoteNG.UI.Controls
+ {
+@@ -53,6 +54,8 @@ namespace mRemoteNG.UI.Controls
+             _mnuQuickConnectProtocol = new ContextMenuStrip(components);
+             _btnConnections = new ToolStripDropDownButton();
+             _mnuConnections = new ContextMenuStrip(components);
++            WorkspaceMenuStyle.ApplyTo(_mnuQuickConnectProtocol);
++            WorkspaceMenuStyle.ApplyTo(_mnuConnections);
+             SuspendLayout();
+             //
+             //Theming support
+@@ -70,9 +73,10 @@ namespace mRemoteNG.UI.Controls
+             // 
+             _cmbQuickConnect.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+             _cmbQuickConnect.AutoCompleteSource = AutoCompleteSource.ListItems;
+-            _cmbQuickConnect.Margin = new Padding(1, 0, 3, 0);
++            _cmbQuickConnect.AutoSize = false;
++            _cmbQuickConnect.Margin = new Padding(4, 1, 6, 1);
+             _cmbQuickConnect.Name = "cmbQuickConnect";
+-            _cmbQuickConnect.Size = new System.Drawing.Size(200, 25);
++            _cmbQuickConnect.Size = new System.Drawing.Size(208, 25);
+             _cmbQuickConnect.ConnectRequested += cmbQuickConnect_ConnectRequested;
+             _cmbQuickConnect.ProtocolChanged += cmbQuickConnect_ProtocolChanged;
+             // 
+@@ -85,7 +89,8 @@ namespace mRemoteNG.UI.Controls
+             _btnQuickConnect,
+             _btnConnections});
+             Location = new System.Drawing.Point(3, 24);
+-            MaximumSize = new System.Drawing.Size(0, 25);
++            Font = new System.Drawing.Font("Segoe UI", 9F);
++            Padding = new Padding(5, 3, 6, 3);
+             Name = "tsQuickConnect";
+             Size = new System.Drawing.Size(387, 25);
+             TabIndex = 18;
+@@ -96,6 +101,7 @@ namespace mRemoteNG.UI.Controls
+             _btnQuickConnect.Image = Resources.Play_Quick;
+             _btnQuickConnect.ImageTransparentColor = System.Drawing.Color.Magenta;
+             _btnQuickConnect.Margin = new Padding(0, 1, 3, 2);
++            _btnQuickConnect.Padding = new Padding(6, 2, 6, 2);
+             _btnQuickConnect.Name = "btnQuickConnect";
+             _btnQuickConnect.Size = new System.Drawing.Size(84, 22);
+             _btnQuickConnect.Text = Language.strMenuConnect;
+@@ -153,7 +159,7 @@ namespace mRemoteNG.UI.Controls
+                     if (fieldInfo.Name == Settings.Default.QuickConnectProtocol)
+                     {
+                         menuItem.Checked = true;
+-                        _btnQuickConnect.Text = Settings.Default.QuickConnectProtocol;
++                        UpdateConnectButtonText(Settings.Default.QuickConnectProtocol);
+                     }
+                     _mnuQuickConnectProtocol.Items.Add(menuItem);
+                 }
+@@ -207,12 +213,17 @@ namespace mRemoteNG.UI.Controls
+         private void SetQuickConnectProtocol(string protocol)
+         {
+             Settings.Default.QuickConnectProtocol = protocol;
+-            _btnQuickConnect.Text = protocol;
++            UpdateConnectButtonText(protocol);
+             foreach (ToolStripMenuItem menuItem in _mnuQuickConnectProtocol.Items)
+             {
+                 menuItem.Checked = menuItem.Text.Equals(protocol);
+             }
+         }
++
++        private void UpdateConnectButtonText(string protocol)
++        {
++            _btnQuickConnect.Text = $"{Language.strMenuConnect.Replace("&", string.Empty)} · {protocol}";
++        }
+         #endregion
+ 
+         #region Connections DropDown
+@@ -265,4 +276,4 @@ namespace mRemoteNG.UI.Controls
+             }
+         }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/mRemoteV1/UI/Forms/OptionsPages/OptionsPage.cs b/mRemoteV1/UI/Forms/OptionsPages/OptionsPage.cs
+index 63357fd..b63a3b8 100644
+--- a/mRemoteV1/UI/Forms/OptionsPages/OptionsPage.cs
++++ b/mRemoteV1/UI/Forms/OptionsPages/OptionsPage.cs
+@@ -57,11 +57,20 @@ namespace mRemoteNG.UI.Forms.OptionsPages
+         }
+         */
+ 
+-	    protected virtual void ApplyTheme()
++        protected override void OnLoad(System.EventArgs e)
+         {
+-            if (!Themes.ThemeManager.getInstance().ThemingActive) return;
+-            BackColor = Themes.ThemeManager.getInstance().ActiveTheme.ExtendedPalette.getColor("Dialog_Background");
+-            ForeColor = Themes.ThemeManager.getInstance().ActiveTheme.ExtendedPalette.getColor("Dialog_Foreground");
++            base.OnLoad(e);
++            ApplyTheme();
++        }
++
++        protected virtual void ApplyTheme()
++        {
++            var themeManager = Themes.ThemeManager.getInstance();
++            var palette = themeManager.ThemingActive && !SystemInformation.HighContrast
++                ? themeManager.ActiveTheme?.ExtendedPalette
++                : null;
++            BackColor = palette?.getColor("Dialog_Background") ?? SystemColors.Control;
++            ForeColor = palette?.getColor("Dialog_Foreground") ?? SystemColors.ControlText;
+             Invalidate();
+         }
+     }
+diff --git a/mRemoteV1/UI/Forms/frmMain.Designer.cs b/mRemoteV1/UI/Forms/frmMain.Designer.cs
+index deba634..986722f 100644
+--- a/mRemoteV1/UI/Forms/frmMain.Designer.cs
++++ b/mRemoteV1/UI/Forms/frmMain.Designer.cs
+@@ -51,7 +51,7 @@ namespace mRemoteNG.UI.Forms
+             // 
+             this.pnlDock.Dock = System.Windows.Forms.DockStyle.Fill;
+             this.pnlDock.DockBackColor = System.Drawing.SystemColors.Control;
+-            this.pnlDock.DockLeftPortion = 230D;
++            this.pnlDock.DockLeftPortion = 276D;
+             this.pnlDock.DockRightPortion = 230D;
+             this.pnlDock.DocumentStyle = WeifenLuo.WinFormsUI.Docking.DocumentStyle.DockingSdi;
+             this.pnlDock.Location = new System.Drawing.Point(0, 0);
+@@ -64,6 +64,8 @@ namespace mRemoteNG.UI.Forms
+             // 
+             this.msMain.Anchor = System.Windows.Forms.AnchorStyles.Left;
+             this.msMain.Dock = System.Windows.Forms.DockStyle.None;
++            this.msMain.Font = new System.Drawing.Font("Segoe UI", 9F);
++            this.msMain.Padding = new System.Windows.Forms.Padding(8, 4, 8, 4);
+             this.msMain.GripMargin = new System.Windows.Forms.Padding(0);
+             this.msMain.GripStyle = System.Windows.Forms.ToolStripGripStyle.Visible;
+             this.msMain.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+@@ -73,7 +75,6 @@ namespace mRemoteNG.UI.Forms
+             this.helpMenu});
+             this.msMain.Location = new System.Drawing.Point(3, 50);
+             this.msMain.Name = "msMain";
+-            this.msMain.Padding = new System.Windows.Forms.Padding(2, 2, 0, 2);
+             this.msMain.Size = new System.Drawing.Size(176, 24);
+             this.msMain.Stretch = false;
+             this.msMain.TabIndex = 0;
+@@ -83,6 +84,7 @@ namespace mRemoteNG.UI.Forms
+             // 
+             this.fileMenu.ConnectionInitiator = null;
+             this.fileMenu.Name = "mMenFile";
++            this.fileMenu.Padding = new System.Windows.Forms.Padding(8, 2, 8, 2);
+             this.fileMenu.Size = new System.Drawing.Size(37, 20);
+             this.fileMenu.Text = Language.strMenuFile;
+             this.fileMenu.TreeWindow = null;
+@@ -93,6 +95,7 @@ namespace mRemoteNG.UI.Forms
+             this.viewMenu.FullscreenHandler = null;
+             this.viewMenu.MainForm = null;
+             this.viewMenu.Name = "mMenView";
++            this.viewMenu.Padding = new System.Windows.Forms.Padding(8, 2, 8, 2);
+             this.viewMenu.Size = new System.Drawing.Size(44, 20);
+             this.viewMenu.Text = Language.strMenuView;
+             this.viewMenu.TsExternalTools = null;
+@@ -105,12 +108,14 @@ namespace mRemoteNG.UI.Forms
+             this.toolsMenu.CredentialProviderCatalog = null;
+             this.toolsMenu.MainForm = null;
+             this.toolsMenu.Name = "mMenTools";
++            this.toolsMenu.Padding = new System.Windows.Forms.Padding(8, 2, 8, 2);
+             this.toolsMenu.Size = new System.Drawing.Size(47, 20);
+             this.toolsMenu.Text = Language.strMenuTools;
+             // 
+             // helpMenu
+             // 
+             this.helpMenu.Name = "mMenInfo";
++            this.helpMenu.Padding = new System.Windows.Forms.Padding(8, 2, 8, 2);
+             this.helpMenu.Size = new System.Drawing.Size(44, 20);
+             this.helpMenu.Text = Language.strMenuHelp;
+             this.helpMenu.TextDirection = System.Windows.Forms.ToolStripTextDirection.Horizontal;
+@@ -148,7 +153,6 @@ namespace mRemoteNG.UI.Forms
+             this._quickConnectToolStrip.Dock = System.Windows.Forms.DockStyle.None;
+             this._quickConnectToolStrip.ForeColor = System.Drawing.SystemColors.ControlText;
+             this._quickConnectToolStrip.Location = new System.Drawing.Point(3, 0);
+-            this._quickConnectToolStrip.MaximumSize = new System.Drawing.Size(0, 25);
+             this._quickConnectToolStrip.Name = "_quickConnectToolStrip";
+             this._quickConnectToolStrip.Size = new System.Drawing.Size(364, 25);
+             this._quickConnectToolStrip.TabIndex = 18;
+diff --git a/mRemoteV1/UI/Forms/frmMain.cs b/mRemoteV1/UI/Forms/frmMain.cs
+index bb21382..56c4e0f 100644
+--- a/mRemoteV1/UI/Forms/frmMain.cs
++++ b/mRemoteV1/UI/Forms/frmMain.cs
+@@ -58,6 +58,10 @@ namespace mRemoteNG.UI.Forms
+ 		{
+ 			_showFullPathInTitle = Settings.Default.ShowCompleteConsPathInTitle;
+ 			InitializeComponent();
++            WorkspaceMenuStyle.ApplyTo(fileMenu.DropDown);
++            WorkspaceMenuStyle.ApplyTo(viewMenu.DropDown);
++            WorkspaceMenuStyle.ApplyTo(toolsMenu.DropDown);
++            WorkspaceMenuStyle.ApplyTo(helpMenu.DropDown);
+             Fullscreen = new FullscreenHandler(this);
+ 
+             //Theming support
+@@ -624,16 +628,35 @@ namespace mRemoteNG.UI.Forms
+         #region Screen Stuff
+         public void SetDefaultLayout()
+         {
++            var toolbarPanel = tsContainer.TopToolStripPanel;
++            if (_quickConnectToolStrip.Visible && _quickConnectToolStrip.Parent == toolbarPanel)
++            {
++                int quickConnectLeft = msMain.Right + 8;
++                int quickConnectWidth = _quickConnectToolStrip.GetPreferredSize(Size.Empty).Width;
++                var toolbarLocation = quickConnectLeft + quickConnectWidth <= toolbarPanel.ClientSize.Width
++                    ? new Point(quickConnectLeft, msMain.Top)
++                    : new Point(msMain.Left, msMain.Bottom);
++                toolbarPanel.Join(_quickConnectToolStrip, toolbarLocation);
++            }
++
+             pnlDock.Visible = false;
+ 
+-            pnlDock.DockLeftPortion = pnlDock.Width * 0.2;
+-            pnlDock.DockRightPortion = pnlDock.Width * 0.2;
++            bool useSideBySidePanels = pnlDock.ClientSize.Width >= 900;
++            pnlDock.DockLeftPortion = Math.Max(1, Math.Min(276, pnlDock.Width * (useSideBySidePanels ? 0.25 : 0.4)));
++            pnlDock.DockRightPortion = Math.Max(1, Math.Min(350, pnlDock.Width * 0.35));
+             pnlDock.DockTopPortion = pnlDock.Height * 0.25;
+             pnlDock.DockBottomPortion = pnlDock.Height * 0.25;
+ 
+             Windows.TreeForm.Show(pnlDock, DockState.DockLeft);
+-            Windows.ConfigForm.Show(pnlDock);
+-            Windows.ConfigForm.DockTo(Windows.TreeForm.Pane, DockStyle.Bottom, -1);
++            if (useSideBySidePanels)
++            {
++                Windows.ConfigForm.Show(pnlDock, DockState.DockRight);
++            }
++            else
++            {
++                Windows.ConfigForm.Show(pnlDock);
++                Windows.ConfigForm.DockTo(Windows.TreeForm.Pane, DockStyle.Bottom, -1);
++            }
+             Windows.ErrorsForm.Show( pnlDock, DockState.DockBottomAutoHide );  
+             Windows.ScreenshotForm.Hide(); 
+ 
+@@ -660,4 +683,4 @@ namespace mRemoteNG.UI.Forms
+             fileMenu.mMenFile_DropDownOpening(sender, e);
+         }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/mRemoteV1/UI/Forms/frmOptions.Designer.cs b/mRemoteV1/UI/Forms/frmOptions.Designer.cs
+index 5b9bbd6..8b54b19 100644
+--- a/mRemoteV1/UI/Forms/frmOptions.Designer.cs
++++ b/mRemoteV1/UI/Forms/frmOptions.Designer.cs
+@@ -48,16 +48,16 @@
+             this.pnlBottom.Dock = System.Windows.Forms.DockStyle.Bottom;
+             this.pnlBottom.Location = new System.Drawing.Point(0, 492);
+             this.pnlBottom.Name = "pnlBottom";
+-            this.pnlBottom.Size = new System.Drawing.Size(764, 35);
++            this.pnlBottom.Size = new System.Drawing.Size(850, 46);
+             this.pnlBottom.TabIndex = 0;
+             // 
+             // splitter1
+             // 
+-            this.splitter1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
++            this.splitter1.BorderStyle = System.Windows.Forms.BorderStyle.None;
+             this.splitter1.Dock = System.Windows.Forms.DockStyle.Bottom;
+             this.splitter1.Location = new System.Drawing.Point(0, 491);
+             this.splitter1.Name = "splitter1";
+-            this.splitter1.Size = new System.Drawing.Size(764, 1);
++            this.splitter1.Size = new System.Drawing.Size(850, 1);
+             this.splitter1.TabIndex = 1;
+             this.splitter1.TabStop = false;
+             // 
+@@ -71,10 +71,12 @@
+             // 
+             // pnlMain
+             // 
++            this.pnlMain.AutoScroll = true;
+             this.pnlMain.Dock = System.Windows.Forms.DockStyle.Fill;
+             this.pnlMain.Location = new System.Drawing.Point(152, 0);
+             this.pnlMain.Name = "pnlMain";
+-            this.pnlMain.Size = new System.Drawing.Size(612, 491);
++            this.pnlMain.Padding = new System.Windows.Forms.Padding(13, 10, 13, 8);
++            this.pnlMain.Size = new System.Drawing.Size(659, 511);
+             this.pnlMain.TabIndex = 4;
+             // 
+             // lstOptionPages
+@@ -94,10 +96,10 @@
+             this.lstOptionPages.Location = new System.Drawing.Point(0, 0);
+             this.lstOptionPages.MultiSelect = false;
+             this.lstOptionPages.Name = "lstOptionPages";
+-            this.lstOptionPages.RowHeight = 25;
++            this.lstOptionPages.RowHeight = 29;
+             this.lstOptionPages.ShowGroups = false;
+             this.lstOptionPages.ShowImagesOnSubItems = true;
+-            this.lstOptionPages.Size = new System.Drawing.Size(151, 491);
++            this.lstOptionPages.Size = new System.Drawing.Size(190, 511);
+             this.lstOptionPages.TabIndex = 2;
+             this.lstOptionPages.TileSize = new System.Drawing.Size(168, 40);
+             this.lstOptionPages.UseCompatibleStateImageBehavior = false;
+@@ -115,9 +117,10 @@
+             // 
+             this.btnCancel._mice = mRemoteNG.UI.Controls.Base.NGButton.MouseState.HOVER;
+             this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+-            this.btnCancel.Location = new System.Drawing.Point(681, 6);
++            this.btnCancel.Anchor = System.Windows.Forms.AnchorStyles.Right | System.Windows.Forms.AnchorStyles.Bottom;
++            this.btnCancel.Location = new System.Drawing.Point(747, 9);
+             this.btnCancel.Name = "btnCancel";
+-            this.btnCancel.Size = new System.Drawing.Size(75, 23);
++            this.btnCancel.Size = new System.Drawing.Size(90, 28);
+             this.btnCancel.TabIndex = 1;
+             this.btnCancel.Text = "Cancel";
+             this.btnCancel.UseVisualStyleBackColor = true;
+@@ -127,9 +130,10 @@
+             // 
+             this.btnOK._mice = mRemoteNG.UI.Controls.Base.NGButton.MouseState.HOVER;
+             this.btnOK.DialogResult = System.Windows.Forms.DialogResult.OK;
+-            this.btnOK.Location = new System.Drawing.Point(600, 6);
++            this.btnOK.Anchor = System.Windows.Forms.AnchorStyles.Right | System.Windows.Forms.AnchorStyles.Bottom;
++            this.btnOK.Location = new System.Drawing.Point(651, 9);
+             this.btnOK.Name = "btnOK";
+-            this.btnOK.Size = new System.Drawing.Size(75, 23);
++            this.btnOK.Size = new System.Drawing.Size(90, 28);
+             this.btnOK.TabIndex = 0;
+             this.btnOK.Text = "OK";
+             this.btnOK.UseVisualStyleBackColor = true;
+@@ -139,15 +143,16 @@
+             // 
+             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+-            this.ClientSize = new System.Drawing.Size(764, 527);
++            this.ClientSize = new System.Drawing.Size(850, 558);
+             this.Controls.Add(this.pnlMain);
+             this.Controls.Add(this.splitter2);
+             this.Controls.Add(this.lstOptionPages);
+             this.Controls.Add(this.splitter1);
+             this.Controls.Add(this.pnlBottom);
+-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Fixed3D;
++            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
+             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
+             this.MaximizeBox = false;
++            this.MinimumSize = new System.Drawing.Size(660, 420);
+             this.Name = "frmOptions";
+             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+             this.Text = "mRemoteNG Options";
+diff --git a/mRemoteV1/UI/Forms/frmOptions.cs b/mRemoteV1/UI/Forms/frmOptions.cs
+index a613469..3513278 100644
+--- a/mRemoteV1/UI/Forms/frmOptions.cs
++++ b/mRemoteV1/UI/Forms/frmOptions.cs
+@@ -2,6 +2,7 @@
+ using System;
+ using System.Collections.Generic;
+ using System.Diagnostics;
++using System.Drawing;
+ using System.Linq;
+ using System.Windows.Forms;
+ 
+@@ -40,9 +41,23 @@ namespace mRemoteNG.UI.Forms
+         }
+         private void ApplyTheme()
+         {
+-            if (!Themes.ThemeManager.getInstance().ThemingActive) return;
+-            BackColor = Themes.ThemeManager.getInstance().ActiveTheme.ExtendedPalette.getColor("Dialog_Background");
+-            ForeColor = Themes.ThemeManager.getInstance().ActiveTheme.ExtendedPalette.getColor("Dialog_Foreground");
++            var themeManager = Themes.ThemeManager.getInstance();
++            var palette = themeManager.ThemingActive && !SystemInformation.HighContrast
++                ? themeManager.ActiveTheme?.ExtendedPalette
++                : null;
++
++            BackColor = palette?.getColor("Dialog_Background") ?? SystemColors.Control;
++            ForeColor = palette?.getColor("Dialog_Foreground") ?? SystemColors.ControlText;
++            pnlMain.BackColor = BackColor;
++            pnlBottom.BackColor = palette?.getColor("CommandBarMenuDefault_Background") ?? SystemColors.Control;
++            splitter1.BackColor = palette?.getColor("List_Item_Border") ?? SystemColors.ControlDark;
++            splitter2.BackColor = splitter1.BackColor;
++            lstOptionPages.BackColor = palette?.getColor("TreeView_Background") ?? SystemColors.Window;
++            lstOptionPages.ForeColor = palette?.getColor("TreeView_Foreground") ?? SystemColors.WindowText;
++            lstOptionPages.SelectedBackColor = palette?.getColor("Treeview_SelectedItem_Active_Background") ?? SystemColors.Highlight;
++            lstOptionPages.SelectedForeColor = palette?.getColor("Treeview_SelectedItem_Active_Foreground") ?? SystemColors.HighlightText;
++            lstOptionPages.UnfocusedSelectedBackColor = palette?.getColor("Treeview_SelectedItem_Inactive_Background") ?? SystemColors.Highlight;
++            lstOptionPages.UnfocusedSelectedForeColor = palette?.getColor("Treeview_SelectedItem_Inactive_Foreground") ?? SystemColors.HighlightText;
+         }
+ 
+         private void ApplyLanguage()
+diff --git a/mRemoteV1/UI/Menu/WorkspaceMenuStyle.cs b/mRemoteV1/UI/Menu/WorkspaceMenuStyle.cs
+new file mode 100644
+index 0000000..b44d470
+--- /dev/null
++++ b/mRemoteV1/UI/Menu/WorkspaceMenuStyle.cs
+@@ -0,0 +1,42 @@
++using System;
++using System.ComponentModel;
++using System.Windows.Forms;
++
++namespace mRemoteNG.UI.Menu
++{
++    internal static class WorkspaceMenuStyle
++    {
++        internal static void ApplyTo(ToolStripDropDown menu)
++        {
++            if (menu == null) return;
++
++            menu.Opening -= ApplyItemSpacing;
++            menu.Opening += ApplyItemSpacing;
++        }
++
++        private static void ApplyItemSpacing(object sender, CancelEventArgs e)
++        {
++            if (e.Cancel) return;
++
++            var menu = (ToolStripDropDown)sender;
++            var owner = menu.OwnerItem?.GetCurrentParent() ?? (menu as ContextMenuStrip)?.SourceControl;
++            if (owner != null)
++                menu.Font = owner.Font;
++
++            foreach (ToolStripItem item in menu.Items)
++            {
++                var menuItem = item as ToolStripMenuItem;
++                if (menuItem == null) continue;
++
++                menuItem.Margin = new Padding(menuItem.Margin.Left, 2, menuItem.Margin.Right, 2);
++                menuItem.DropDownOpening -= ApplyToSubmenu;
++                menuItem.DropDownOpening += ApplyToSubmenu;
++            }
++        }
++
++        private static void ApplyToSubmenu(object sender, EventArgs e)
++        {
++            ApplyTo(((ToolStripMenuItem)sender).DropDown);
++        }
++    }
++}
+diff --git a/mRemoteV1/UI/Window/ConfigWindow.cs b/mRemoteV1/UI/Window/ConfigWindow.cs
+index f6591cc..fc69f32 100644
+--- a/mRemoteV1/UI/Window/ConfigWindow.cs
++++ b/mRemoteV1/UI/Window/ConfigWindow.cs
+@@ -42,6 +42,7 @@ namespace mRemoteNG.UI.Window
+         private ToolStripSeparator _toolStripSeparator1;
+         private FilteredPropertyGrid _pGrid;
+         private ThemeManager _themeManager;
++        private VisualStudioToolStripExtender _toolStripExtender;
+ 
+         private AbstractConnectionRecord _selectedTreeNode;
+         public AbstractConnectionRecord SelectedTreeNode
+@@ -57,6 +58,7 @@ namespace mRemoteNG.UI.Window
+         private void InitializeComponent()
+ 		{
+             _components = new System.ComponentModel.Container();
++            _toolStripExtender = new VisualStudioToolStripExtender(_components);
+             Load += Config_Load;
+             SystemColorsChanged += Config_SystemColorsChanged;
+             _pGrid = new FilteredPropertyGrid();
+@@ -83,23 +85,23 @@ namespace mRemoteNG.UI.Window
+             _btnHostStatus = new ToolStripButton();
+             _btnHostStatus.Click += btnHostStatus_Click;
+             CMenIcons = new ContextMenuStrip(_components);
++            mRemoteNG.UI.Menu.WorkspaceMenuStyle.ApplyTo(PropertyGridContextMenu);
++            mRemoteNG.UI.Menu.WorkspaceMenuStyle.ApplyTo(CMenIcons);
+             PropertyGridContextMenu.SuspendLayout();
+             SuspendLayout();
+             //
+             //pGrid
+             //
+-            _pGrid.Anchor = ((AnchorStyles.Top | AnchorStyles.Bottom)
+-                | AnchorStyles.Left)
+-                | AnchorStyles.Right;
++            _pGrid.Dock = DockStyle.Fill;
+             _pGrid.BrowsableProperties = null;
+             _pGrid.ContextMenuStrip = PropertyGridContextMenu;
+-            _pGrid.Font = new Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, Convert.ToByte(0));
++            _pGrid.Font = new Font("Segoe UI", 9F);
+             _pGrid.HiddenAttributes = null;
+             _pGrid.HiddenProperties = null;
+             _pGrid.Location = new Point(0, 0);
+             _pGrid.Name = "_pGrid";
+             _pGrid.PropertySort = PropertySort.Categorized;
+-            _pGrid.Size = new Size(226, 530);
++            _pGrid.Size = new Size(340, 530);
+             _pGrid.TabIndex = 0;
+             _pGrid.UseCompatibleTextRendering = true;
+             //
+@@ -191,9 +193,9 @@ namespace mRemoteNG.UI.Window
+             //
+             //Config
+             //
+-            ClientSize = new Size(226, 530);
++            ClientSize = new Size(340, 530);
+             Controls.Add(_pGrid);
+-            Font = new Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, Convert.ToByte(0));
++            Font = new Font("Segoe UI", 9F);
+             HideOnClose = true;
+             Icon = Resources.Config_Icon;
+             Name = "ConfigWindow";
+@@ -614,22 +616,40 @@ namespace mRemoteNG.UI.Window
+ 			_propertyGridContextMenuShowHelpText.Text = Language.strMenuShowHelpText;
+ 		}
+ 		
+-		private new void ApplyTheme()
+-		{
+-            if (Themes.ThemeManager.getInstance().ThemingActive)
++        private new void ApplyTheme()
++        {
++            if (_themeManager == null || IsDisposed)
++                return;
++
++            bool useTheme = _themeManager.ThemingActive && !SystemInformation.HighContrast;
++            var theme = useTheme ? _themeManager.ActiveTheme : null;
++            var palette = theme?.ExtendedPalette;
++            _pGrid.BackColor = palette?.getColor("CommandBarMenuDefault_Background") ?? SystemColors.Control;
++            _pGrid.ForeColor = palette?.getColor("Dialog_Foreground") ?? SystemColors.ControlText;
++            _pGrid.ViewBackColor = palette?.getColor("List_Item_Background") ?? SystemColors.Window;
++            _pGrid.ViewForeColor = palette?.getColor("List_Item_Foreground") ?? SystemColors.WindowText;
++            _pGrid.LineColor = palette?.getColor("List_Item_Border") ?? SystemColors.InactiveBorder;
++            _pGrid.HelpBackColor = palette?.getColor("TextBox_Background") ?? SystemColors.Control;
++            _pGrid.HelpForeColor = palette?.getColor("TextBox_Foreground") ?? SystemColors.ControlText;
++            _pGrid.CategoryForeColor = palette?.getColor("List_Header_Foreground") ?? SystemColors.ControlText;
++            _pGrid.CommandsDisabledLinkColor = palette?.getColor("List_Item_Disabled_Foreground") ?? SystemColors.GrayText;
++            _pGrid.CommandsBackColor = palette?.getColor("List_Item_Disabled_Background") ?? SystemColors.Control;
++            _pGrid.CommandsForeColor = palette?.getColor("List_Item_Foreground") ?? SystemColors.ControlText;
++
++            var toolStrip = _pGrid.Controls.OfType<ToolStrip>().FirstOrDefault();
++            if (theme == null)
+             {
+-                _pGrid.BackColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("TextBox_Background");
+-                _pGrid.ForeColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("TextBox_Foreground");
+-                _pGrid.ViewBackColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("List_Item_Background");
+-                _pGrid.ViewForeColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("List_Item_Foreground");
+-                _pGrid.LineColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("List_Item_Border");
+-                _pGrid.HelpBackColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("TextBox_Background");
+-                _pGrid.HelpForeColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("TextBox_Foreground");
+-                _pGrid.CategoryForeColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("List_Header_Foreground"); 
+-                _pGrid.CommandsDisabledLinkColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("List_Item_Disabled_Foreground");
+-                _pGrid.CommandsBackColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("List_Item_Disabled_Background"); 
+-                _pGrid.CommandsForeColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("List_Item_Disabled_Foreground");
++                if (toolStrip != null)
++                    toolStrip.RenderMode = ToolStripRenderMode.System;
++                PropertyGridContextMenu.RenderMode = ToolStripRenderMode.System;
++                CMenIcons.RenderMode = ToolStripRenderMode.System;
++                return;
+             }
++
++            if (toolStrip != null)
++                _toolStripExtender.SetStyle(toolStrip, theme.Version, theme.Theme);
++            _toolStripExtender.SetStyle(PropertyGridContextMenu, theme.Version, theme.Theme);
++            _toolStripExtender.SetStyle(CMenIcons, theme.Version, theme.Theme);
+         }
+ 
+         private void AddToolStripItems()
+@@ -688,15 +708,16 @@ namespace mRemoteNG.UI.Window
+ 			ApplyLanguage();
+             _themeManager = ThemeManager.getInstance();
+             _themeManager.ThemeChanged += ApplyTheme;
++            AddToolStripItems();
+             ApplyTheme();
+-			AddToolStripItems();
+ 			_pGrid.HelpVisible = Settings.Default.ShowConfigHelpText;
+ 		}
+ 		
+-		private void Config_SystemColorsChanged(object sender, EventArgs e)
+-		{
+-			AddToolStripItems();
+-		}
++        private void Config_SystemColorsChanged(object sender, EventArgs e)
++        {
++            AddToolStripItems();
++            ApplyTheme();
++        }
+ 		
+ 		private void pGrid_PropertyValueChanged(object s, PropertyValueChangedEventArgs e)
+ 		{
+@@ -1680,4 +1701,4 @@ namespace mRemoteNG.UI.Window
+         }
+         #endregion
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/mRemoteV1/UI/Window/ConnectionTreeWindow.Designer.cs b/mRemoteV1/UI/Window/ConnectionTreeWindow.Designer.cs
+index 034e6e6..199da85 100644
+--- a/mRemoteV1/UI/Window/ConnectionTreeWindow.Designer.cs
++++ b/mRemoteV1/UI/Window/ConnectionTreeWindow.Designer.cs
+@@ -27,6 +27,7 @@ namespace mRemoteNG.UI.Window
+             mRemoteNG.Tree.TreeNodeCompositeClickHandler treeNodeCompositeClickHandler2 = new mRemoteNG.Tree.TreeNodeCompositeClickHandler();
+             this.olvConnections = new mRemoteNG.UI.Controls.ConnectionTree();
+             this.pnlConnections = new System.Windows.Forms.Panel();
++            this.searchBar = new System.Windows.Forms.Panel();
+             this.PictureBox1 = new System.Windows.Forms.PictureBox();
+             this.txtSearch = new Controls.Base.NGTextBox();
+             this.msMain = new System.Windows.Forms.MenuStrip();
+@@ -38,6 +39,7 @@ namespace mRemoteNG.UI.Window
+             this.mMenSortAscending = new System.Windows.Forms.ToolStripMenuItem();
+             ((System.ComponentModel.ISupportInitialize)(this.olvConnections)).BeginInit();
+             this.pnlConnections.SuspendLayout();
++            this.searchBar.SuspendLayout();
+             ((System.ComponentModel.ISupportInitialize)(this.PictureBox1)).BeginInit();
+             this.msMain.SuspendLayout();
+             this.SuspendLayout();
+@@ -49,9 +51,7 @@ namespace mRemoteNG.UI.Window
+             // olvConnections
+             // 
+             this.olvConnections.AllowDrop = true;
+-            this.olvConnections.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+-            | System.Windows.Forms.AnchorStyles.Left) 
+-            | System.Windows.Forms.AnchorStyles.Right)));
++            this.olvConnections.Dock = System.Windows.Forms.DockStyle.Fill;
+             this.olvConnections.BorderStyle = System.Windows.Forms.BorderStyle.None;
+             this.olvConnections.CellEditUseWholeCell = false;
+             this.olvConnections.ConnectionTreeModel = new ConnectionTreeModel();
+@@ -73,6 +73,7 @@ namespace mRemoteNG.UI.Window
+             treeNodeCompositeClickHandler2.ClickHandlers = new mRemoteNG.Tree.ITreeNodeClickHandler<ConnectionInfo>[0];
+             this.olvConnections.SingleClickHandler = treeNodeCompositeClickHandler2;
+             this.olvConnections.Size = new System.Drawing.Size(192, 410);
++            this.olvConnections.RowHeight = 28;
+             this.olvConnections.TabIndex = 20;
+             this.olvConnections.UnfocusedSelectedBackColor = System.Drawing.SystemColors.Highlight;
+             this.olvConnections.UnfocusedSelectedForeColor = System.Drawing.SystemColors.HighlightText;
+@@ -86,19 +87,28 @@ namespace mRemoteNG.UI.Window
+             this.pnlConnections.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+             | System.Windows.Forms.AnchorStyles.Left) 
+             | System.Windows.Forms.AnchorStyles.Right)));
+-            this.pnlConnections.Controls.Add(this.PictureBox1);
+-            this.pnlConnections.Controls.Add(this.txtSearch);
+             this.pnlConnections.Controls.Add(this.olvConnections);
++            this.pnlConnections.Controls.Add(this.searchBar);
+             this.pnlConnections.Location = new System.Drawing.Point(0, 25);
+             this.pnlConnections.Name = "pnlConnections";
+             this.pnlConnections.Size = new System.Drawing.Size(192, 428);
+             this.pnlConnections.TabIndex = 9;
+             // 
++            // searchBar
++            //
++            this.searchBar.Controls.Add(this.PictureBox1);
++            this.searchBar.Controls.Add(this.txtSearch);
++            this.searchBar.Dock = System.Windows.Forms.DockStyle.Top;
++            this.searchBar.Margin = new System.Windows.Forms.Padding(0);
++            this.searchBar.Name = "searchBar";
++            this.searchBar.Size = new System.Drawing.Size(192, 34);
++            this.searchBar.TabStop = false;
++            //
+             // PictureBox1
+             // 
+-            this.PictureBox1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
++            this.PictureBox1.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left;
+             this.PictureBox1.Image = global::mRemoteNG.Resources.Search;
+-            this.PictureBox1.Location = new System.Drawing.Point(2, 412);
++            this.PictureBox1.Location = new System.Drawing.Point(9, 9);
+             this.PictureBox1.Name = "PictureBox1";
+             this.PictureBox1.Size = new System.Drawing.Size(16, 16);
+             this.PictureBox1.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
+@@ -107,13 +117,13 @@ namespace mRemoteNG.UI.Window
+             // 
+             // txtSearch
+             // 
+-            this.txtSearch.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
++            this.txtSearch.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
+             | System.Windows.Forms.AnchorStyles.Right)));
+             this.txtSearch.BorderStyle = System.Windows.Forms.BorderStyle.None;
+             this.txtSearch.ForeColor = System.Drawing.SystemColors.GrayText;
+-            this.txtSearch.Location = new System.Drawing.Point(19, 413);
++            this.txtSearch.Location = new System.Drawing.Point(32, 9);
+             this.txtSearch.Name = "txtSearch";
+-            this.txtSearch.Size = new System.Drawing.Size(171, 15);
++            this.txtSearch.Size = new System.Drawing.Size(150, 15);
+             this.txtSearch.TabIndex = 30;
+             this.txtSearch.TabStop = false;
+             this.txtSearch.Text = "Search";
+@@ -124,7 +134,8 @@ namespace mRemoteNG.UI.Window
+             // 
+             // msMain
+             // 
+-            this.msMain.Font = new System.Drawing.Font("Segoe UI", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
++            this.msMain.Font = new System.Drawing.Font("Segoe UI", 9F);
++            this.msMain.Padding = new System.Windows.Forms.Padding(5, 3, 5, 3);
+             this.msMain.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+             this.mMenAddConnection,
+             this.mMenAddFolder,
+@@ -201,6 +212,8 @@ namespace mRemoteNG.UI.Window
+             ((System.ComponentModel.ISupportInitialize)(this.olvConnections)).EndInit();
+             this.pnlConnections.ResumeLayout(false);
+             this.pnlConnections.PerformLayout();
++            this.searchBar.ResumeLayout(false);
++            this.searchBar.PerformLayout();
+             ((System.ComponentModel.ISupportInitialize)(this.PictureBox1)).EndInit();
+             this.msMain.ResumeLayout(false);
+             this.msMain.PerformLayout();
+@@ -212,6 +225,7 @@ namespace mRemoteNG.UI.Window
+ 
+         private System.ComponentModel.IContainer components;
+         private Controls.ConnectionTree olvConnections;
++        private System.Windows.Forms.Panel searchBar;
+         private WeifenLuo.WinFormsUI.Docking.VisualStudioToolStripExtender vsToolStripExtender;
+     }
+ }
+diff --git a/mRemoteV1/UI/Window/ConnectionTreeWindow.cs b/mRemoteV1/UI/Window/ConnectionTreeWindow.cs
+index e5976d1..fa34079 100644
+--- a/mRemoteV1/UI/Window/ConnectionTreeWindow.cs
++++ b/mRemoteV1/UI/Window/ConnectionTreeWindow.cs
+@@ -5,6 +5,7 @@ using mRemoteNG.Themes;
+ using mRemoteNG.Tree;
+ using mRemoteNG.Tree.Root;
+ using mRemoteNG.UI.Controls;
++using mRemoteNG.UI.Menu;
+ using System;
+ using System.Collections.Generic;
+ using System.ComponentModel;
+@@ -60,12 +61,9 @@ namespace mRemoteNG.UI.Window
+             //work on the theme change
+             _themeManager = ThemeManager.getInstance();
+             _themeManager.ThemeChanged += ApplyTheme;
++            WorkspaceMenuStyle.ApplyTo(mMenView.DropDown);
++            WorkspaceMenuStyle.ApplyTo(olvConnections.ContextMenuStrip);
+             ApplyTheme();
+-
+-            txtSearch.Multiline = true;
+-            txtSearch.MinimumSize = new Size(0, 14);
+-            txtSearch.Size = new Size(txtSearch.Size.Width, 14);
+-            txtSearch.Multiline = false;
+         }
+ 
+         private void ApplyLanguage()
+@@ -97,6 +95,7 @@ namespace mRemoteNG.UI.Window
+             olvConnections.UnfocusedSelectedForeColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("Treeview_SelectedItem_Inactive_Foreground");
+             //There is a border around txtSearch that dont theme well
+             txtSearch.BackColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("TextBox_Background");
++            searchBar.BackColor = txtSearch.BackColor;
+             txtSearch.ForeColor = _themeManager.ActiveTheme.ExtendedPalette.getColor("TextBox_Foreground");
+         }
+         #endregion
+@@ -319,4 +318,4 @@ namespace mRemoteNG.UI.Window
+ 		}
+         #endregion
+ 	}
+-}
+\ No newline at end of file
++}
+diff --git a/mRemoteV1/app.config b/mRemoteV1/app.config
+index e0a91c6..0dc4f8a 100644
+--- a/mRemoteV1/app.config
++++ b/mRemoteV1/app.config
+@@ -210,7 +210,7 @@
+         <value>True</value>
+       </setting>
+       <setting name="QuickyTBLocation" serializeAs="String">
+-        <value>3, 24</value>
++        <value>240, 0</value>
+       </setting>
+       <setting name="QuickyTBParentDock" serializeAs="String">
+         <value>Top</value>
+@@ -534,7 +534,7 @@
+         <value>release</value>
+       </setting>
+       <setting name="ThemeName" serializeAs="String">
+-        <value />
++        <value>darcula</value>
+       </setting>
+       <setting name="ShowConfigHelpText" serializeAs="String">
+         <value>True</value>
+@@ -654,7 +654,7 @@
+         <value>True</value>
+       </setting>
+       <setting name="ThemingActive" serializeAs="String">
+-        <value>False</value>
++        <value>True</value>
+       </setting>
+       <setting name="ConDefaultUsername" serializeAs="String">
+         <value />
+diff --git a/mRemoteV1/mRemoteV1.csproj b/mRemoteV1/mRemoteV1.csproj
+index 8e4f033..5fac83e 100644
+--- a/mRemoteV1/mRemoteV1.csproj
++++ b/mRemoteV1/mRemoteV1.csproj
+@@ -647,6 +647,7 @@
+       <SubType>Component</SubType>
+     </Compile>
+     <Compile Include="UI\Menu\ScreenSelectionSystemMenu.cs" />
++    <Compile Include="UI\Menu\WorkspaceMenuStyle.cs" />
+     <Compile Include="UI\Menu\ToolsMenu.cs">
+       <SubType>Component</SubType>
+     </Compile>
+@@ -1621,4 +1622,4 @@ powershell.exe -ExecutionPolicy Bypass -File "%25psScriptsDir%25\postbuild_mremo
+     </PropertyGroup>
+     <Error Condition="!Exists('..\packages\Geckofx45.45.0.32\build\Geckofx45.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Geckofx45.45.0.32\build\Geckofx45.targets'))" />
+   </Target>
+-</Project>
+\ No newline at end of file
++</Project>
