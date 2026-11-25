@@ -68,7 +68,7 @@ $packages = @(Get-ChildItem -LiteralPath (Join-Path $source 'Release') -Filter '
 if ($packages.Count -ne 1) { throw "Expected one MSI, found $($packages.Count)." }
 $dist = Join-Path $PSScriptRoot 'dist'
 New-Item -ItemType Directory -Path $dist | Out-Null
-$fileName = 'mRemoteNG-1.76.20-Workspace-v2-x86.msi'
+$fileName = 'mRemoteNG-1.76.20-Workspace-v3-x86.msi'
 $installerPath = Join-Path $dist $fileName
 Copy-Item -LiteralPath $packages[0].FullName -Destination $installerPath
 
@@ -111,8 +111,8 @@ $installedHash = (Get-FileHash -LiteralPath $installedExe -Algorithm SHA256).Has
 if ($installedHash -ne (Get-FileHash -LiteralPath $compiledExe -Algorithm SHA256).Hash) {
     throw 'The installed application differs from the compiled executable.'
 }
-$installedTheme = Join-Path $installPath 'Themes\Workspace.vstheme'
-$sourceTheme = Join-Path $source 'mRemoteV1\Resources\Themes\darcula.vstheme'
+$installedTheme = Join-Path $installPath 'Themes\Workspace Graphite.vstheme'
+$sourceTheme = Join-Path $source 'mRemoteV1\Resources\Themes\Workspace Graphite.vstheme'
 if ((Get-FileHash -LiteralPath $installedTheme -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $sourceTheme -Algorithm SHA256).Hash) {
     throw 'The installed theme differs from the Workspace theme.'
 }

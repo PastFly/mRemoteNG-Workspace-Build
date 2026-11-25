@@ -32,7 +32,7 @@ $config = [xml](Get-Content -LiteralPath $configPath -Raw)
 $preferences = [ordered]@{
     DoUpgrade = 'False'; CheckForUpdatesAsked = 'True'; CheckForUpdatesOnStartup = 'False'
     UseSQLServer = 'False'; OpenConsFromLastSession = 'False'; SingleClickOnConnectionOpensIt = 'False'
-    StartupComponentsCheck = 'False'; ThemeName = 'darcula'; ThemingActive = 'True'
+    StartupComponentsCheck = 'False'; ThemeName = 'Workspace'; ThemingActive = 'True'
     MainFormLocation = '0, 0'; MainFormSize = '1000, 700'; CreateEmptyPanelOnStartUp = 'True'
     OverrideUICulture = 'ru'
 }
@@ -44,16 +44,46 @@ foreach ($name in $preferences.Keys) {
 $config.Save($configPath)
 
 Add-Type -AssemblyName System.Drawing
-Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 public static class WorkspaceWindowCapture {
     [StructLayout(LayoutKind.Sequential)]
     public struct Rect { public int Left, Top, Right, Bottom; }
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window, out Rect rect);
     [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr window, IntPtr target, uint flags);
+    private delegate bool ChildCallback(IntPtr window, IntPtr argument);
+    [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr window, ChildCallback callback, IntPtr argument);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder name, int length);
+    [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
+    public static bool SelectFirstConnection(IntPtr window) {
+        const uint listViewGetItemCount = 0x1004;
+        const uint listViewGetNextItem = 0x100C;
+        const uint leftButtonDown = 0x0201;
+        const uint leftButtonUp = 0x0202;
+        const int selected = 0x0002;
+        var list = IntPtr.Zero;
+        EnumChildWindows(window, (child, argument) => {
+            var name = new StringBuilder(128);
+            GetClassName(child, name, name.Capacity);
+            if (name.ToString().Contains("SysListView32") &&
+                SendMessage(child, listViewGetItemCount, IntPtr.Zero, IntPtr.Zero).ToInt32() > 3) {
+                list = child;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        if (list == IntPtr.Zero) return false;
+
+        // The fixture expands its first folder. Row 2 is the first RDP entry.
+        var clientPoint = new IntPtr((73 << 16) | 106);
+        SendMessage(list, leftButtonDown, new IntPtr(1), clientPoint);
+        SendMessage(list, leftButtonUp, IntPtr.Zero, clientPoint);
+        return SendMessage(list, listViewGetNextItem, new IntPtr(-1), new IntPtr(selected)).ToInt32() == 2;
+    }
 }
 '@
 
@@ -73,18 +103,10 @@ try {
     if (($rect.Right - $rect.Left) -lt 900) { throw 'Did not find the main mRemoteNG window.' }
 
     Start-Sleep -Seconds 2
-    try {
-        $window = [Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
-        $name = New-Object Windows.Automation.PropertyCondition ([Windows.Automation.AutomationElement]::NameProperty, 'demo-rdp-02')
-        $row = $window.FindFirst([Windows.Automation.TreeScope]::Descendants, $name)
-        $selection = $null
-        if ($row -and $row.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern, [ref] $selection)) {
-            $selection.Select()
-            Start-Sleep -Milliseconds 500
-        }
-    } catch {
-        Write-Host 'The sample row could not be selected through UI Automation.'
+    if (![WorkspaceWindowCapture]::SelectFirstConnection($process.MainWindowHandle)) {
+        throw 'Could not select the sample RDP connection in the real tree.'
     }
+    Start-Sleep -Milliseconds 500
     $bitmap = New-Object Drawing.Bitmap (($rect.Right - $rect.Left), ($rect.Bottom - $rect.Top), [Drawing.Imaging.PixelFormat]::Format24bppRgb)
     $g = [Drawing.Graphics]::FromImage($bitmap)
     try {
@@ -95,6 +117,11 @@ try {
             $g.ReleaseHdc($dc)
         }
         if (!$captured) { throw 'Could not capture the mRemoteNG window.' }
+        $center = $bitmap.GetPixel([int] ($bitmap.Width / 2), [int] ($bitmap.Height / 2))
+        if (($center.R -ne 35 -or $center.G -ne 36 -or $center.B -ne 36) -and
+            ($center.R -ne 27 -or $center.G -ne 28 -or $center.B -ne 28)) {
+            throw "Graphite theme is not visible in the real window. Center pixel is $center."
+        }
         $bitmap.Save((Join-Path $visual 'mRemoteNG-Workspace-Windows.png'), [Drawing.Imaging.ImageFormat]::Png)
     } finally {
         $g.Dispose()
