@@ -99,7 +99,10 @@ if (Test-Path -LiteralPath $previousDir) {
 }
 Install-ForSmokeTest $installerPath $installPath (Join-Path $env:RUNNER_TEMP 'mremoteng-msi-install.log')
 $registered = @(Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
-    Where-Object DisplayName -eq 'mRemoteNG')
+    Where-Object {
+        $displayName = $_.PSObject.Properties['DisplayName']
+        $null -ne $displayName -and $displayName.Value -eq 'mRemoteNG'
+    })
 if ($registered.Count -ne 1) { throw "Expected one registered mRemoteNG product, found $($registered.Count)." }
 
 $installedExe = Join-Path $installPath 'mRemoteNG.exe'

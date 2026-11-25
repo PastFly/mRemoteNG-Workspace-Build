@@ -32,9 +32,6 @@ jobs:
       - name: Build and inspect the installer
         shell: pwsh
         run: .\Build-WorkspaceMsi.ps1
-      - name: Launch mRemoteNG and verify the layout
-        shell: powershell
-        run: .\Test-WorkspaceUi.ps1
       - name: Store the installer and checksum
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
@@ -42,6 +39,9 @@ jobs:
           path: dist/*
           if-no-files-found: error
           retention-days: 14
+      - name: Launch mRemoteNG and verify the layout
+        shell: powershell
+        run: .\Test-WorkspaceUi.ps1
       - name: Store the Windows screenshot
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
