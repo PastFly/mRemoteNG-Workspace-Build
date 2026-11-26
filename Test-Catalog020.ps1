@@ -76,7 +76,22 @@ function Read-CatalogDocument {
 }
 
 function Initialize-SqlFixture {
-    $instance = '(localdb)\MSSQLLocalDB'
+    $instanceName = 'RemoteWorkspaceFixture'
+    $tool = Get-Command 'SqlLocalDB.exe' -ErrorAction SilentlyContinue
+    $sqlLocalDb = if ($tool) { $tool.Source } else {
+        Get-ChildItem -Path "$env:ProgramFiles\Microsoft SQL Server\*\Tools\Binn\SqlLocalDB.exe" -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+    }
+    if (!$sqlLocalDb) { throw 'SQL Server LocalDB tooling is missing on the Windows runner.' }
+    & $sqlLocalDb versions | Out-Host
+    & $sqlLocalDb create $instanceName -s | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        & $sqlLocalDb info $instanceName | Out-Host
+        $log = Join-Path $env:LOCALAPPDATA "Microsoft\Microsoft SQL Server Local DB\Instances\$instanceName\error.log"
+        if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Tail 35 | Out-Host }
+        throw 'The test SQL Server instance failed to start.'
+    }
+    $instance = "(localdb)\$instanceName"
     $db = 'RemoteWorkspaceSmoke'
     $connection = [Data.SqlClient.SqlConnection]::new("Data Source=$instance;Initial Catalog=master;Integrated Security=True;Connect Timeout=35")
     try {
@@ -120,10 +135,12 @@ function Import-Fixture {
         if ($null -eq (Find-Name $Window 'Загрузить каталог' -Optional)) { return }
         Start-Sleep -Milliseconds 400
     } until ([DateTime]::UtcNow -ge $deadline)
-    throw 'The SQL importer did not complete.'
+    $condition = [Windows.Automation.PropertyCondition]::new(
+        [Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Text)
+    $texts = $Window.FindAll($tree, $condition) | ForEach-Object { $_.Current.Name }
+    throw "The SQL importer did not complete. Visible text: $($texts -join ' | ')"
 }
 
-$fixture = Initialize-SqlFixture
 $app = Open-App
 try {
     $window = $app.Window
@@ -164,8 +181,10 @@ try {
     $profile = $doc.Catalog.Profiles.SelectSingleNode("Profile[Name='QA profile']")
     if ($profile.Protocol -ne 'SSH2' -or $profile.Port -ne '22') { throw 'Protocol and port edits were not saved.' }
 
+    Write-Host "Windows catalog checks passed through protocol edit."
+    $fixture = Initialize-SqlFixture
     Import-Fixture $window $fixture
-    $doc = Read-CatalogDocument 'fixture.example'
+    $doc = Read-CatalogDocument '<Host>fixture.example</Host>'
     $imported = $doc.Catalog.Profiles.SelectSingleNode("Profile[Name='SQL fixture']")
     $child = $doc.Catalog.Folders.SelectSingleNode("Folder[Name='Imported child']")
     if (!$imported -or !$child -or $imported.FolderId -ne $child.Id -or $imported.SmartCards -ne 'true') {
