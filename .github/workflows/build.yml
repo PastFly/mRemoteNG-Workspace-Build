@@ -22,17 +22,20 @@ jobs:
           SOURCE_ZIP_BASE64: ${{ secrets.SOURCE_ZIP_BASE64 }}
         run: .\Build-Isolated-Windows.ps1 -Phase Extract
       - name: Compile and install the MSI
+        id: build_msi
         shell: pwsh
         run: .\Build-Isolated-Windows.ps1 -Phase Build
       - name: Launch and exercise the installed app
         shell: powershell
         run: .\Build-Isolated-Windows.ps1 -Phase Exercise
-      - name: Encrypt the verified deliverables
+      - name: Encrypt the installer package
+        if: ${{ !cancelled() && steps.build_msi.outcome == 'success' }}
         shell: pwsh
         env:
           OUTPUT_AES_KEY_BASE64: ${{ secrets.OUTPUT_AES_KEY_BASE64 }}
         run: .\Build-Isolated-Windows.ps1 -Phase Encrypt
       - name: Store the encrypted package
+        if: ${{ !cancelled() && steps.build_msi.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: windows-installer-encrypted

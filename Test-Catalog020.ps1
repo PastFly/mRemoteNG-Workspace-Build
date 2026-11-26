@@ -105,24 +105,31 @@ function Read-CatalogDocument {
 }
 
 function Initialize-SqlFixture {
-    $instanceName = 'RemoteWorkspaceFixture'
-    $tool = Get-Command 'SqlLocalDB.exe' -ErrorAction SilentlyContinue
-    $sqlLocalDb = if ($tool) { $tool.Source } else {
-        Get-ChildItem -Path "$env:ProgramFiles\Microsoft SQL Server\*\Tools\Binn\SqlLocalDB.exe" -ErrorAction SilentlyContinue |
-            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+    $fixtureDir = Join-Path $env:RUNNER_TEMP 'rw-sql-fixture'
+    New-Item -Path $fixtureDir -ItemType Directory -Force | Out-Null
+    $package = Join-Path $fixtureDir 'SQLEXPR_x64_ENU.exe'
+    $installerUrl = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLEXPR_x64_ENU.exe'
+    Invoke-WebRequest -UseBasicParsing -Uri $installerUrl -OutFile $package
+    if ((Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash -ne '2E61C8BBDE6021F9026C54AD9DB4BBB1227E68761D4C00A6A50A2C70FE7AFE05') {
+        throw 'The SQL Server Express setup checksum did not match.'
     }
-    if (!$sqlLocalDb) { throw 'SQL Server LocalDB tooling is missing on the Windows runner.' }
-    & $sqlLocalDb versions | Out-Host
-    & $sqlLocalDb create $instanceName -s | Out-Host
-    if ($LASTEXITCODE -ne 0) {
-        & $sqlLocalDb info $instanceName | Out-Host
-        $log = Join-Path $env:LOCALAPPDATA "Microsoft\Microsoft SQL Server Local DB\Instances\$instanceName\error.log"
+
+    $media = Join-Path $fixtureDir 'media'
+    $extract = Start-Process -FilePath $package -ArgumentList "/Q /x:`"$media`"" -Wait -PassThru
+    $setup = Join-Path $media 'setup.exe'
+    if ($extract.ExitCode -ne 0 -or !(Test-Path -LiteralPath $setup)) { throw 'Unable to extract SQL Server Express setup.' }
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $arguments = "/Q /ACTION=Install /FEATURES=SQLEngine /INSTANCENAME=RWFIXTURE /SQLSYSADMINACCOUNTS=`"$identity`" /TCPENABLED=0 /NPENABLED=1 /IACCEPTSQLSERVERLICENSETERMS /UPDATEENABLED=FALSE"
+    $install = Start-Process -FilePath $setup -ArgumentList $arguments -Wait -PassThru
+    if ($install.ExitCode -notin 0, 3010) {
+        $log = Join-Path $env:ProgramFiles 'Microsoft SQL Server\160\Setup Bootstrap\Log\Summary.txt'
         if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Tail 35 | Out-Host }
-        throw 'The test SQL Server instance failed to start.'
+        throw "SQL Server Express failed to install with exit code $($install.ExitCode)."
     }
-    $instance = "(localdb)\$instanceName"
+    Write-Host 'Installed the isolated SQL Server Express fixture.'
+    $instance = 'np:\\.\pipe\MSSQL$RWFIXTURE\sql\query'
     $db = 'RemoteWorkspaceSmoke'
-    $connection = [Data.SqlClient.SqlConnection]::new("Data Source=$instance;Initial Catalog=master;Integrated Security=True;Connect Timeout=35")
+    $connection = [Data.SqlClient.SqlConnection]::new("Data Source=$instance;Initial Catalog=master;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;Connect Timeout=35")
     try {
         $connection.Open()
         $command = $connection.CreateCommand()
