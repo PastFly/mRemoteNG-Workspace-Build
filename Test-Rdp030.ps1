@@ -25,6 +25,17 @@ public static class CatalogTestWindows {
     [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hwnd);
     [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hwnd, IntPtr dc);
     [DllImport("gdi32.dll")] private static extern uint GetPixel(IntPtr dc, int x, int y);
+    public static uint[] RowPixels(int x, int y) {
+        IntPtr dc = GetDC(IntPtr.Zero);
+        try {
+            uint[] pixels = new uint[96];
+            for (int i = 0; i < pixels.Length; i++) {
+                pixels[i] = GetPixel(dc, x + 2 * (i % 16), y + 2 * (i / 16));
+                if (pixels[i] == 0xffffffff) throw new InvalidOperationException("Could not sample folder row.");
+            }
+            return pixels;
+        } finally { ReleaseDC(IntPtr.Zero, dc); }
+    }
     public static int Brightness(int x, int y) {
         IntPtr dc = GetDC(IntPtr.Zero);
         try {
@@ -79,6 +90,24 @@ function Find-ControlId {
 function Invoke-ControlId {
     param($Window, [string] $Id)
     (Find-ControlId $Window $Id).GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+}
+
+function Wait-InspectorState {
+    param($Window, [int] $Visible, [string] $Stage)
+    $expected = if ($Visible) { 'Скрыть свойства' } else { 'Показать свойства' }
+    $button = Find-ControlId $Window 'InspectorToggle'
+    $key = 'HKEY_CURRENT_USER\Software\Remote Workspace\Appearance'
+    $deadline = [DateTime]::UtcNow.AddSeconds(8)
+    do {
+        $label = $button.Current.Name
+        $stored = [Microsoft.Win32.Registry]::GetValue($key, 'InspectorVisible', '<missing>')
+        if ($label -eq $expected -and [string]$stored -eq [string]$Visible) {
+            Write-Host "$Stage inspector state confirmed: label '$label', HKCU InspectorVisible=$stored."
+            return
+        }
+        Start-Sleep -Milliseconds 120
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw "$Stage inspector mismatch: expected '$expected', HKCU=$Visible. Actual '$label', HKCU=$stored."
 }
 
 function Maximize-Window {
@@ -187,6 +216,10 @@ function Move-TreeItem {
     $y2 = [int] ($to.Y + ($to.Height / 2))
     [void] [CatalogTestWindows]::SetCursorPos($x1, $y1)
     Start-Sleep -Milliseconds 180
+    # Sample across the folder label, away from the mouse cursor and drag icon.
+    $patchX = $x2 + 27
+    $patchY = $y2 - 5
+    $before = [CatalogTestWindows]::RowPixels($patchX, $patchY)
     [CatalogTestWindows]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero)
     try {
         for ($step = 1; $step -le 8; $step++) {
@@ -198,6 +231,13 @@ function Move-TreeItem {
         if ($feedback -notlike '*QA RDP One*QA Target*') {
             throw "Drag destination hint missing before drop: $feedback"
         }
+        $after = [CatalogTestWindows]::RowPixels($patchX, $patchY)
+        $changed = 0
+        for ($index = 0; $index -lt $before.Length; $index++) {
+            if ($before[$index] -ne $after[$index]) { $changed++ }
+        }
+        if ($changed -lt 8) { throw "The destination row did not repaint during drag ($changed changed pixels)." }
+        Write-Host "Destination row repainted during drag ($changed of $($before.Length) sampled pixels changed)."
         if ($Cancel) {
             [CatalogTestWindows]::keybd_event(27, 0, 0, [UIntPtr]::Zero)
             [CatalogTestWindows]::keybd_event(27, 0, 2, [UIntPtr]::Zero)
@@ -335,13 +375,15 @@ try {
     $null = Find-Name $window 'QA RDP One (копия)' -Type $treeItem
     Write-Host 'Dragging persisted the new folder, and right-click duplicate created a second profile.'
     Invoke-Control $window 'Скрыть свойства'
+    Wait-InspectorState $window 0 'Before closing'
     Stop-App $app
     $app = Open-App
     $window = $app.Window
     Maximize-Window $window
-    $null = Find-Name $window 'Показать свойства' -Type ([Windows.Automation.ControlType]::Button)
+    Wait-InspectorState $window 0 'After restarting'
     if ([Math]::Abs((Get-StageBrightness $window) - $dark) -gt 30) { throw 'The dark theme was lost on restart.' }
     Invoke-Control $window 'Показать свойства'
+    Wait-InspectorState $window 1 'After restoring'
     Start-Sleep -Milliseconds 200
     if ([Math]::Abs((Find-ControlId $window 'TreeSplitter').Current.BoundingRectangle.X - $leftPosition) -gt 4 -or
         [Math]::Abs((Find-ControlId $window 'InspectorSplitter').Current.BoundingRectangle.X - $rightPosition) -gt 4) {

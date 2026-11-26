@@ -41,6 +41,7 @@ try {
     Run-Linux -Arguments @('/usr/bin/timeout','240','/bin/bash',$linuxPath)
     $password = 'Qa!' + [guid]::NewGuid().ToString('N') + 'a7'
     Write-Host "::add-mask::$password"
+    $OutputEncoding = [Text.UTF8Encoding]::new($false)
     "rwalpha:$password`nrwbeta:$password" | & $wsl -d $distro -u root --exec /bin/bash $linuxPath set-passwords
     if ($LASTEXITCODE -ne 0) { throw 'Unable to initialize disposable credentials.' }
 

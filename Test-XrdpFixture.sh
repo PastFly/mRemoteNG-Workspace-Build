@@ -3,10 +3,10 @@
 set -eu
 if [ "${1:-}" = set-passwords ]; then
     # The Windows pipeline terminates the last input record with CRLF.
-    tr -d '\r' | /usr/sbin/chpasswd
+    LC_ALL=C sed '1s/^\xEF\xBB\xBF//; s/\r$//' | /usr/sbin/chpasswd
     exit
 fi
-export DEBIAN_FRONTEND=noninteractive
+export DEBIAN_FRONTEND=noninteractive LC_ALL=C
 printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d
 chmod 755 /usr/sbin/policy-rc.d
 apt-get -o Acquire::Retries=2 -qq update
