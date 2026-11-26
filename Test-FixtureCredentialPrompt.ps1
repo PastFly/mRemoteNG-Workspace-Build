@@ -24,7 +24,7 @@ function Submit-FixtureCredential([string] $Endpoint, [string] $Username, [strin
             catch [System.Windows.Automation.ElementNotAvailableException] { continue }
             $mentionsFixture = $elements | Where-Object {
                 $_.Current.ControlType -eq [Windows.Automation.ControlType]::Text -and
-                $_.Current.Name -match '(?i)(?<![a-z0-9.-])rw-xrdp-fixture\.test(?![a-z0-9.-])'
+                $_.Current.Name -match '(?i)(?<![\w.-])rw-xrdp-fixture\.test(?![\w-]|\.[\w.-])'
             } | Select-Object -First 1
             if (!$mentionsFixture) { continue }
             $edits = @($elements | Where-Object {

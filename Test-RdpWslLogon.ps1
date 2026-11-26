@@ -112,7 +112,6 @@ try {
     Run-Linux -Arguments @('/bin/bash',$linuxPath,'verify-bind')
     Set-FixtureStage 'Independent xrdp server is ready on loopback with a trusted TLS certificate.'
 
-    $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $store)
     $profiles = foreach ($username in @('rwalpha','rwbeta')) {
         "<Profile><Id>$username</Id><Name>$username</Name><Host>$endpoint</Host><Protocol>RDP</Protocol><Port>$port</Port><User>$username</User><PromptForCredentials>true</PromptForCredentials></Profile>"
     }
