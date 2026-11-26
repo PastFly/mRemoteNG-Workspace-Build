@@ -110,6 +110,55 @@ function Wait-InspectorState {
     throw "$Stage inspector mismatch: expected '$expected', HKCU=$Visible. Actual '$label', HKCU=$stored."
 }
 
+function Wait-ConnectionsState {
+    param($Window, [int] $Visible, [string] $Stage)
+    $id = if ($Visible) { 'CollapseConnections' } else { 'RestoreConnections' }
+    $condition = [Windows.Automation.PropertyCondition]::new(
+        [Windows.Automation.AutomationElement]::AutomationIdProperty, $id)
+    $key = 'HKEY_CURRENT_USER\Software\Remote Workspace\Appearance'
+    $deadline = [DateTime]::UtcNow.AddSeconds(8)
+    do {
+        $button = $Window.FindFirst($tree, $condition)
+        $stored = [Microsoft.Win32.Registry]::GetValue($key, 'TreeVisible', '<missing>')
+        if ($button -and !$button.Current.IsOffscreen -and [string]$stored -eq [string]$Visible) { return }
+        Start-Sleep -Milliseconds 120
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw "$Stage tree mismatch: expected on-screen $id and HKCU TreeVisible=$Visible, got HKCU=$stored."
+}
+
+function Assert-TabSelection {
+    param($Tabs, [string] $Name, [int] $Count)
+    $type = [Windows.Automation.PropertyCondition]::new(
+        [Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::ListItem)
+    $deadline = [DateTime]::UtcNow.AddSeconds(6)
+    do {
+        $items = $Tabs.FindAll($tree, $type)
+        $selected = @($items | Where-Object {
+            $_.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected
+        })
+        if ($items.Count -eq $Count -and $selected.Count -eq 1 -and $selected[0].Current.Name -eq $Name) { return }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw "Expected $Count tabs with '$Name' active. Actual tabs: $($items.Count), selection: $($selected | ForEach-Object { $_.Current.Name })."
+}
+
+function Close-NamedTab {
+    param($Tabs, [string] $Name, [switch]$Mouse)
+    $tab = Find-Name $Tabs $Name -Type ([Windows.Automation.ControlType]::ListItem)
+    $close = Find-Name $tab ("Закрыть вкладку " + $Name) -Type ([Windows.Automation.ControlType]::Button)
+    if ($close.Current.AutomationId -ne 'CloseSessionTab' -or $close.Current.IsOffscreen) {
+        throw "Tab '$Name' has no visible close button."
+    }
+    if ($Mouse) {
+        $bounds = $close.Current.BoundingRectangle
+        [void] [CatalogTestWindows]::SetCursorPos(($bounds.X + $bounds.Width / 2), ($bounds.Y + $bounds.Height / 2))
+        [CatalogTestWindows]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero)
+        [CatalogTestWindows]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero)
+    } else {
+        $close.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+    }
+}
+
 function Maximize-Window {
     param($Window)
     [void] [CatalogTestWindows]::SetForegroundWindow([IntPtr]$Window.Current.NativeWindowHandle)
@@ -280,8 +329,14 @@ $one.Start()
 $two.Start()
 $first = $null
 $second = $null
+$third = $null
 $app = $null
 try {
+    # Emulate a 0.4 user's appearance settings before the first upgraded launch.
+    $settings = 'HKCU:\Software\Remote Workspace\Appearance'
+    New-Item -Path $settings -Force | Out-Null
+    New-ItemProperty -Path $settings -Name InspectorVisible -Value 0 -PropertyType DWord -Force | Out-Null
+    Remove-ItemProperty -LiteralPath $settings -Name TreeVisible -ErrorAction SilentlyContinue
     New-Item -Path (Split-Path -Parent $store) -ItemType Directory -Force | Out-Null
     $credential = [Convert]::ToBase64String([Security.Cryptography.ProtectedData]::Protect(
         [Text.Encoding]::Unicode.GetBytes('Ephemeral-QA-Password-7w!'), $null,
@@ -299,6 +354,7 @@ try {
   <Profiles>
     <Profile><Id>qa-one</Id><FolderId>qa-source</FolderId><Name>QA RDP One</Name><Host>127.0.0.1</Host><Protocol>RDP</Protocol><Port>$portOne</Port><User>Fixture</User><ProtectedPassword>$credential</ProtectedPassword><InheritSmartCards>true</InheritSmartCards></Profile>
     <Profile><Id>qa-two</Id><FolderId>qa-nested</FolderId><Name>QA RDP Two</Name><Host>127.0.0.1</Host><Protocol>RDP</Protocol><Port>$portTwo</Port><User>Fixture</User><ProtectedPassword>$credential</ProtectedPassword></Profile>
+    <Profile><Id>qa-three</Id><Name>QA RDP Three</Name><Host>127.0.0.1</Host><Protocol>RDP</Protocol><Port>$portOne</Port><User>Fixture</User><ProtectedPassword>$credential</ProtectedPassword></Profile>
   </Profiles>
 </Catalog>
 "@ | Set-Content -LiteralPath $store -Encoding UTF8
@@ -308,6 +364,10 @@ try {
     $treeItem = [Windows.Automation.ControlType]::TreeItem
     $tabItem = [Windows.Automation.ControlType]::ListItem
     Maximize-Window $window
+    Wait-InspectorState $window 0 'Upgrade from 0.4'
+    if ((Find-ControlId $window 'CollapseConnections').Current.IsOffscreen) { throw 'Legacy prefs should show the connections pane.' }
+    Invoke-ControlId $window 'RestoreInspector'
+    Wait-InspectorState $window 1 'First restoration'
     Invoke-ControlId $window 'ExpandAllButton'
     $null = Find-Name $window 'QA RDP Two' -Type $treeItem
     Invoke-ControlId $window 'CollapseAllButton'
@@ -339,19 +399,39 @@ try {
     $null = Select-Item $window 'QA RDP Two' $treeItem
     Invoke-Control $window 'Подключиться'
     $second = Wait-Tcp $two 'Second RDP tab'
-    $null = Select-Item $window 'QA RDP One' $tabItem
-    $null = Select-Item $window 'QA RDP Two' $tabItem
-    Write-Host 'Two independent native RDP connection attempts opened sockets, and both tabs were selectable.'
-    Invoke-Control $window 'Скрыть свойства'
-    $null = Find-Name $window 'Показать свойства' -Type ([Windows.Automation.ControlType]::Button)
-    Invoke-Control $window 'Показать свойства'
-    Invoke-Control $window 'Закрыть вкладку'
-    Invoke-Control $window 'Закрыть вкладку'
+    $null = Select-Item $window 'QA RDP Three' $treeItem
+    Invoke-Control $window 'Подключиться'
+    $third = Wait-Tcp $one 'Third RDP tab'
+    $tabs = Find-ControlId $window 'SessionTabs'
+    $null = Select-Item $tabs 'QA RDP One' $tabItem
+    $null = Select-Item $tabs 'QA RDP Three' $tabItem
+    Assert-TabSelection $tabs 'QA RDP Three' 3
+    Write-Host 'Three separate native RDP connection attempts opened sockets, and their tabs were selectable.'
+
+    Invoke-ControlId $window 'CollapseConnections'
+    Wait-ConnectionsState $window 0 'Connections collapsed'
+    Wait-InspectorState $window 1 'Connections collapsed independently'
+    Invoke-ControlId $window 'CollapseInspector'
+    Wait-InspectorState $window 0 'Both collapsed'
+    Assert-TabSelection $tabs 'QA RDP Three' 3
+    Invoke-ControlId $window 'RestoreConnections'
+    Wait-ConnectionsState $window 1 'Connections restored'
+    Wait-InspectorState $window 0 'Inspector remains collapsed'
+    Invoke-ControlId $window 'RestoreInspector'
+    Wait-InspectorState $window 1 'Both restored'
+    Assert-TabSelection $tabs 'QA RDP Three' 3
+
+    Close-NamedTab $tabs 'QA RDP One' -Mouse
+    Assert-TabSelection $tabs 'QA RDP Three' 2
+    Close-NamedTab $tabs 'QA RDP Three'
+    Assert-TabSelection $tabs 'QA RDP Two' 1
+    Close-NamedTab $tabs 'QA RDP Two'
+    Write-Host 'Closing an inactive tab using its X preserved the active tab. Closing the active and final tabs selected the remaining session and the workspace.'
     $null = Find-Name $window 'Откройте подключение'
     Set-Control $window 'Поиск подключений' 'QA RDP Two'
-    $null = Find-Name $window 'Подключения: 1 из 2'
+    $null = Find-Name $window 'Подключения: 1 из 3'
     Set-Control $window 'Поиск подключений' ''
-    $null = Find-Name $window 'Подключения: 2 из 2'
+    $null = Find-Name $window 'Подключения: 3 из 3'
     $sourceBranch = Find-Name $window 'QA Source' -Type $treeItem
     $sourceBranch.GetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
     $source = Find-Name $window 'QA RDP One' -Type $treeItem
@@ -374,13 +454,18 @@ try {
     Open-TreeContextMenu $window $source $app.Process.Id
     $null = Find-Name $window 'QA RDP One (копия)' -Type $treeItem
     Write-Host 'Dragging persisted the new folder, and right-click duplicate created a second profile.'
-    Invoke-Control $window 'Скрыть свойства'
+    Invoke-ControlId $window 'CollapseConnections'
+    Wait-ConnectionsState $window 0 'Before closing'
+    Invoke-ControlId $window 'CollapseInspector'
     Wait-InspectorState $window 0 'Before closing'
     Stop-App $app
     $app = Open-App
     $window = $app.Window
     Maximize-Window $window
     Wait-InspectorState $window 0 'After restarting'
+    Wait-ConnectionsState $window 0 'After restarting'
+    Invoke-ControlId $window 'RestoreConnections'
+    Wait-ConnectionsState $window 1 'After restarting and restoring'
     if ([Math]::Abs((Get-StageBrightness $window) - $dark) -gt 30) { throw 'The dark theme was lost on restart.' }
     Invoke-Control $window 'Показать свойства'
     Wait-InspectorState $window 1 'After restoring'
@@ -406,6 +491,7 @@ try {
 } finally {
     if ($null -ne $first) { $first.Dispose() }
     if ($null -ne $second) { $second.Dispose() }
+    if ($null -ne $third) { $third.Dispose() }
     $one.Stop()
     $two.Stop()
     if ($null -ne $app -and !$app.Process.HasExited) { Stop-Process -Id $app.Process.Id -Force -ErrorAction SilentlyContinue }

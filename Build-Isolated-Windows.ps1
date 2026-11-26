@@ -17,7 +17,7 @@ if ($Phase -eq 'Extract') {
         Write-Host "Source archive checksum $($digest.Hash)"
         Expand-Archive -LiteralPath $archive -DestinationPath $base
         if ($env:UPGRADE_SOURCE) {
-            [IO.File]::WriteAllBytes($archive, [Convert]::FromBase64String($env:UPGRADE_SOURCE))
+            [IO.File]::WriteAllBytes($archive, [Convert]::FromBase64String(($env:UPGRADE_SOURCE + $env:UPGRADE_SOURCE_CONTINUED)))
             Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $base 'previous')
         }
     } finally {

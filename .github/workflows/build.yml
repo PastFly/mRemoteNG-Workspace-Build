@@ -6,13 +6,18 @@ on:
       windows_loopback:
         description: Also compare the local Windows RDP listener
         type: boolean
-        default: true
+        default: false
+      reuse_fixture:
+        description: Reuse the verified build fixture from the previous validation run
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   independent-fixture:
+    if: ${{ !inputs.reuse_fixture }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
@@ -34,7 +39,6 @@ jobs:
           compression-level: 0
 
   build:
-    needs: independent-fixture
     runs-on: windows-2022
     timeout-minutes: 22
     environment: remote-workspace-msi-20261126
@@ -49,6 +53,7 @@ jobs:
           SOURCE_ZIP_BASE64: ${{ secrets.SOURCE_ZIP_BASE64 }}
           SOURCE_ZIP_CONTINUED: ${{ secrets.SOURCE_ZIP_CONTINUED }}
           UPGRADE_SOURCE: ${{ secrets.UPGRADE_SOURCE }}
+          UPGRADE_SOURCE_CONTINUED: ${{ secrets.UPGRADE_SOURCE_CONTINUED }}
         run: .\Build-Isolated-Windows.ps1 -Phase Extract
       - name: Compile and install the MSI
         id: build_msi
@@ -57,26 +62,15 @@ jobs:
       - name: Launch and exercise the installed app
         shell: powershell
         run: .\Build-Isolated-Windows.ps1 -Phase Exercise
+      - name: Exercise native Windows session tabs
+        shell: powershell
+        run: .\Test-NativeHost.ps1 -Exe (Join-Path $env:ProgramFiles 'Remote Workspace\RemoteWorkspace.exe')
       - name: Test authenticated sessions on the local Windows RDP listener
         if: ${{ inputs.windows_loopback && !cancelled() && steps.build_msi.outcome == 'success' }}
         continue-on-error: true
         timeout-minutes: 6
         shell: powershell
         run: .\Test-RdpLocalLogon.ps1 -Exe (Join-Path $env:ProgramFiles 'Remote Workspace\RemoteWorkspace.exe')
-      - name: Load independent server fixture
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: distro-test-fixture
-          path: ${{ runner.temp }}/rdp-fixture
-      - name: Test two desktops on an independent loopback RDP server
-        if: ${{ !cancelled() && steps.build_msi.outcome == 'success' }}
-        continue-on-error: true
-        timeout-minutes: 7
-        shell: powershell
-        env:
-          RDP_FIXTURE_ROOTFS: ${{ runner.temp }}/rdp-fixture/test-rdp-rootfs.tar.gz
-          RDP_FIXTURE_SHA256: ${{ needs.independent-fixture.outputs.sha256 }}
-        run: .\Test-RdpWslLogon.ps1 -Exe (Join-Path $env:ProgramFiles 'Remote Workspace\RemoteWorkspace.exe')
       - name: Encrypt the installer package
         if: ${{ !cancelled() && steps.build_msi.outcome == 'success' }}
         shell: pwsh
@@ -92,3 +86,39 @@ jobs:
           if-no-files-found: error
           retention-days: 2
           compression-level: 0
+
+  desktop:
+    if: ${{ !cancelled() && needs.build.result == 'success' && (inputs.reuse_fixture || needs.independent-fixture.result == 'success') }}
+    needs: [build, independent-fixture]
+    runs-on: windows-2022
+    timeout-minutes: 9
+    permissions:
+      contents: read
+      actions: read
+    environment: remote-workspace-msi-20261126
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: windows-installer-encrypted
+          path: ${{ runner.temp }}/installer
+      - name: Validate and install the packaged build
+        shell: pwsh
+        env:
+          OUTPUT_AES_KEY_BASE64: ${{ secrets.OUTPUT_AES_KEY_BASE64 }}
+        run: .\Install-TestPackage.ps1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: distro-test-fixture
+          run-id: ${{ inputs.reuse_fixture && '45799399220' || github.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/rdp-fixture
+      - name: Open two independent desktops in the installed client
+        shell: powershell
+        timeout-minutes: 5
+        env:
+          RDP_FIXTURE_ROOTFS: ${{ runner.temp }}/rdp-fixture/test-rdp-rootfs.tar.gz
+          RDP_FIXTURE_SHA256: ${{ inputs.reuse_fixture && '3c8b8a00186f11d65ce7fce38a2a8048e22c7d204d7845c088048703076ea312' || needs.independent-fixture.outputs.sha256 }}
+        run: .\Test-RdpWslLogon.ps1 -Exe (Join-Path $env:ProgramFiles 'Remote Workspace\RemoteWorkspace.exe')

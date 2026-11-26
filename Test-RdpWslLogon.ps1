@@ -1,8 +1,45 @@
 ﻿[CmdletBinding()]
-param([Parameter(Mandatory)][string] $Exe)
+param([Parameter(Mandatory)][string] $Exe, [switch] $InsideWatchdog, [string] $AuditDirectory)
+$ErrorActionPreference = 'Stop'
+if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
+    throw 'This test requires an isolated hosted runner.'
+}
+if (!$InsideWatchdog) {
+    $audit = Join-Path $env:RUNNER_TEMP ('rw-acceptance-' + [guid]::NewGuid().ToString('N'))
+    $null = New-Item -Type Directory $audit
+    $stageFile = Join-Path $audit 'stage'
+    $stdout = Join-Path $audit 'stdout'
+    $stderr = Join-Path $audit 'stderr'
+    $arguments = @('-NoProfile','-NonInteractive','-File',('"' + $PSCommandPath + '"'),'-Exe',('"' + $Exe + '"'),
+        '-InsideWatchdog','-AuditDirectory',('"' + $audit + '"'))
+    $child = Start-Process (Join-Path $PSHOME 'powershell.exe') -ArgumentList $arguments -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    $last = ''
+    $deadline = [DateTime]::UtcNow.AddSeconds(245)
+    while (!$child.WaitForExit(1500) -and [DateTime]::UtcNow -lt $deadline) {
+        if (Test-Path -LiteralPath $stageFile) {
+            $current = [IO.File]::ReadAllText($stageFile)
+            if ($current -and $current -ne $last) { $last = $current; Write-Host "Acceptance: $current" }
+        }
+    }
+    if (!$child.HasExited) {
+        Write-Host "::error::Independent fixture deadline reached at stage '$last'."
+        # Kill just this test process tree. The job VM is discarded afterwards.
+        & taskkill.exe /PID $child.Id /T /F | Out-Null
+    }
+    foreach ($log in @($stdout,$stderr)) {
+        if (Test-Path $log) { Get-Content -LiteralPath $log | ForEach-Object { Write-Host $_ } }
+    }
+    if (!$child.HasExited -or $child.ExitCode -ne 0) { throw "Independent fixture failed at '$last'." }
+    return
+}
+function Set-FixtureStage([string] $Name) {
+    [IO.File]::WriteAllText((Join-Path $AuditDirectory 'stage'), $Name)
+    Write-Host $Name
+}
 
 . (Join-Path $PSScriptRoot 'Test-Rdp030.ps1') -Exe $Exe -OnlyHelpers
 . (Join-Path $PSScriptRoot 'Test-RdpSessionControls.ps1')
+. (Join-Path $PSScriptRoot 'Test-FixtureCredentialPrompt.ps1')
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
     throw 'The WSL RDP fixture requires a disposable hosted Windows runner.'
 }
@@ -27,15 +64,16 @@ try {
     if ([string]::IsNullOrWhiteSpace($tar)) {
         $tar = Join-Path $env:RUNNER_TEMP 'rdp-fixture/test-rdp-rootfs.tar.gz'
     }
-    Write-Host 'Checking the SHA256 of the preprovisioned independent RDP fixture.'
+    Set-FixtureStage 'Checking the SHA256 of the preprovisioned independent RDP fixture.'
     if ($env:RDP_FIXTURE_SHA256 -notmatch '^[0-9A-Fa-f]{64}$' -or
         (Get-FileHash -LiteralPath $tar -Algorithm SHA256).Hash -ne $env:RDP_FIXTURE_SHA256) {
         throw 'The downloaded preprovisioned fixture must match the Linux job digest.'
     }
+    Set-FixtureStage 'Importing the signed-package filesystem into WSL1.'
     & $wsl --import $distro (Join-Path $folder 'root') $tar --version 1
     if ($LASTEXITCODE -ne 0) { throw 'WSL1 distro import failed.' }
     $imported = $true
-    Write-Host 'Provisioning the TLS-only loopback xrdp fixture and two test profiles.'
+    Set-FixtureStage 'Provisioning the TLS-only loopback xrdp fixture and two test profiles.'
     # WSL1 mounts Windows drive roots under /mnt/<letter> by default.
     $scriptPath = Join-Path $folder 'fixture.sh'
     $fixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Test-XrdpFixture.sh')).Replace("`r`n", "`n")
@@ -48,15 +86,16 @@ try {
     "rwalpha:$password`nrwbeta:$password" | & $wsl -d $distro -u root --exec /bin/bash $linuxPath set-passwords
     if ($LASTEXITCODE -ne 0) { throw 'Unable to initialize disposable credentials.' }
 
+    Set-FixtureStage 'Reading the guest TLS identity.'
     $public = (Run-Linux -Arguments @('/bin/cat','/etc/xrdp/qa-cert.pem')) -join [Environment]::NewLine
     $publicFile = Join-Path $folder 'linux-server.cer'
     [IO.File]::WriteAllText($publicFile, $public, [Text.Encoding]::ASCII)
-    Write-Host 'Trusting the generated fixture TLS certificate.'
+    Set-FixtureStage 'Trusting the generated fixture TLS certificate.'
     $certificate = Import-Certificate -FilePath $publicFile -CertStoreLocation 'Cert:\LocalMachine\Root'
     Add-Content -LiteralPath $hosts -Value ([Environment]::NewLine + "127.0.0.1 $endpoint") -Encoding ASCII
     $ips = [Net.Dns]::GetHostAddresses($endpoint)
     if ($ips.Count -ne 1 -or ![Net.IPAddress]::IsLoopback($ips[0])) { throw 'Fixture DNS must resolve to loopback.' }
-    Write-Host 'Starting xrdp and sesman under an independent WSL supervisor.'
+    Set-FixtureStage 'Starting xrdp and sesman under an independent WSL supervisor.'
     $server = Start-Process -FilePath $wsl -ArgumentList @('-d', $distro, '-u','root','--exec','/bin/bash',('"' + $linuxPath + '"'),'serve') `
         -RedirectStandardOutput (Join-Path $folder 'daemon.out') -RedirectStandardError (Join-Path $folder 'daemon.err') -PassThru
     $listening = $false
@@ -71,24 +110,26 @@ try {
     }
     if (!$listening) { throw 'WSL xrdp did not listen on loopback within 15 seconds.' }
     Run-Linux -Arguments @('/bin/bash',$linuxPath,'verify-bind')
-    Write-Host 'Independent xrdp server is ready on loopback with a trusted TLS certificate.'
+    Set-FixtureStage 'Independent xrdp server is ready on loopback with a trusted TLS certificate.'
 
-    $credential = [Convert]::ToBase64String([Security.Cryptography.ProtectedData]::Protect(
-        [Text.Encoding]::Unicode.GetBytes($password), $null, [Security.Cryptography.DataProtectionScope]::CurrentUser))
-    Write-Host "::add-mask::$credential"
+    $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $store)
     $profiles = foreach ($username in @('rwalpha','rwbeta')) {
-        "<Profile><Id>$username</Id><Name>$username</Name><Host>$endpoint</Host><Protocol>RDP</Protocol><Port>$port</Port><User>$username</User><ProtectedPassword>$credential</ProtectedPassword></Profile>"
+        "<Profile><Id>$username</Id><Name>$username</Name><Host>$endpoint</Host><Protocol>RDP</Protocol><Port>$port</Port><User>$username</User><PromptForCredentials>true</PromptForCredentials></Profile>"
     }
+    $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $store)
     "<Catalog><Revision>independent-rdp-fixture</Revision><Folders/><Profiles>$profiles</Profiles></Catalog>" |
         Set-Content -LiteralPath $store -Encoding UTF8
-    Write-Host 'Launching the installed client against the independent server.'
+    Set-FixtureStage 'Launching the installed client against the independent server.'
     $app = Open-App
     $names = @('rwalpha','rwbeta')
     $controls = Get-FixtureControls $app.Window $names
     foreach ($username in $names) {
-        Write-Host "Opening the $username graphical desktop."
+        Set-FixtureStage "Opening the $username graphical desktop."
         $controls.Items[$username].Select()
         $controls.Connect.Invoke()
+        Set-FixtureStage "Waiting for the Windows sign-in dialog for $username."
+        Submit-FixtureCredential $endpoint $username $password
+        Set-FixtureStage "Waiting for authenticated display for $username."
         $ready = $false
         $deadline = [DateTime]::UtcNow.AddSeconds(30)
         while ([DateTime]::UtcNow -lt $deadline -and !$ready) {
@@ -105,7 +146,9 @@ try {
         $null = Run-Linux -Arguments @('/usr/bin/pgrep','-u',$username,'-x','xmessage')
     }
     if (@($displays | Select-Object -Unique).Count -ne 2) { throw 'The users must have independent graphical desktops.' }
-    Write-Host 'Verified two simultaneous authenticated xrdp desktops and switching between their installed-app tabs.'
+    . (Join-Path $PSScriptRoot 'Test-NativeHost.ps1') -Exe $Exe -OnlyAssertions
+    Assert-HostedMstscTabs $app.Window $names
+    Set-FixtureStage 'Verified two simultaneous authenticated xrdp desktops hosted in independent mstsc tabs.'
 } catch {
     Write-Host ('Independent desktop test failed: ' + $_.Exception.Message)
     if ($imported) {
@@ -113,6 +156,7 @@ try {
     }
     throw
 } finally {
+    Set-FixtureStage 'Closing fixture processes and removing temporary state.'
     if ($null -ne $app -and !$app.Process.HasExited) {
         $null = $app.Process.CloseMainWindow()
         if (!$app.Process.WaitForExit(3000)) { Stop-Process -Id $app.Process.Id -Force }
