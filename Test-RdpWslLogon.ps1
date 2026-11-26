@@ -23,12 +23,14 @@ function Run-Linux([string[]] $Arguments) {
 }
 try {
     $null = New-Item -ItemType Directory -Path $folder
-    $tar = Join-Path $folder 'ubuntu-base.tar.gz'
-    $uri = 'https://cdimage.ubuntu.com/ubuntu-base/releases/22.04/release/ubuntu-base-22.04.5-base-amd64.tar.gz'
-    Write-Host 'Downloading the pinned Ubuntu Base WSL fixture image.'
-    & curl.exe --fail --silent --show-error --location --retry 2 --max-time 90 $uri --output $tar
-    if ($LASTEXITCODE -ne 0 -or (Get-FileHash $tar -Algorithm SHA256).Hash -ne '242cd8898b33ea806ef5f13b1076ed7c76f9f989d18384452f7166692438ff1a') {
-        throw 'Ubuntu Base archive download or SHA256 validation failed.'
+    $tar = $env:RDP_FIXTURE_ROOTFS
+    if ([string]::IsNullOrWhiteSpace($tar)) {
+        $tar = Join-Path $env:RUNNER_TEMP 'rdp-fixture/test-rdp-rootfs.tar.gz'
+    }
+    Write-Host 'Checking the SHA256 of the preprovisioned independent RDP fixture.'
+    if ($env:RDP_FIXTURE_SHA256 -notmatch '^[0-9A-Fa-f]{64}$' -or
+        (Get-FileHash -LiteralPath $tar -Algorithm SHA256).Hash -ne $env:RDP_FIXTURE_SHA256) {
+        throw 'The downloaded preprovisioned fixture must match the Linux job digest.'
     }
     & $wsl --import $distro (Join-Path $folder 'root') $tar --version 1
     if ($LASTEXITCODE -ne 0) { throw 'WSL1 distro import failed.' }

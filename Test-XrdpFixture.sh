@@ -23,12 +23,11 @@ if [ "${1:-}" = serve ]; then
     /usr/sbin/xrdp --nodaemon </dev/null >/tmp/rw-xrdp-console.log 2>&1
     exit
 fi
-export DEBIAN_FRONTEND=noninteractive LC_ALL=C
-printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d
-chmod 755 /usr/sbin/policy-rc.d
-apt-get -o Acquire::Retries=2 -qq update
-apt-get -o Acquire::Retries=2 -qq install --no-install-recommends -y \
-  xrdp tigervnc-standalone-server x11-utils xauth openssl iproute2 procps >/tmp/rw-install.log
+test -x /usr/sbin/xrdp
+test -x /usr/bin/Xtigervnc
+# Supply the package's legacy key for xrdp startup, even though it is never
+# negotiated on the TLS-only listener.
+if [ ! -s /etc/xrdp/rsakeys.ini ]; then /usr/bin/xrdp-keygen xrdp /etc/xrdp/rsakeys.ini; fi
 server=rw-xrdp-fixture.test
 openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 -subj "/CN=$server" \
     -addext "subjectAltName=DNS:$server" -addext "extendedKeyUsage=serverAuth" \
