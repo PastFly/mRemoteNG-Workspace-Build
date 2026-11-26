@@ -25,10 +25,10 @@ $app = $null
 $createdUsers = [System.Collections.Generic.List[string]]::new()
 
 try {
-    $externalAdapters = @(Get-NetAdapter -IncludeHidden | Where-Object {
-        $_.Status -eq 'Up' -and $_.InterfaceDescription -notmatch 'Loopback'
-    } | Select-Object -ExpandProperty Name)
-    if ($externalAdapters.Count -eq 0) { throw 'Failed to enumerate the runner network adapters.' }
+    $externalAddresses = @(Get-NetIPAddress -AddressState Preferred | Where-Object {
+        ![Net.IPAddress]::IsLoopback([Net.IPAddress]::Parse($_.IPAddress))
+    } | Select-Object -ExpandProperty IPAddress -Unique)
+    if ($externalAddresses.Count -eq 0) { throw 'Failed to enumerate non-loopback addresses.' }
 
     $rule = @{
         DisplayName = $firewallName
@@ -37,7 +37,7 @@ try {
         LocalPort = $port
         Action = 'Block'
         Profile = 'Any'
-        InterfaceAlias = $externalAdapters
+        LocalAddress = $externalAddresses
     }
     New-NetFirewallRule @rule | Out-Null
     $rule.Protocol = 'UDP'
