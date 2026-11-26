@@ -142,7 +142,7 @@ try {
         if ($body.Count -ne $length -or $body[7] -ne 2) { throw 'Fixture endpoint did not negotiate TLS/CredSSP.' }
         $tls = [Net.Security.SslStream]::new($transport, $true)
         try {
-            $tls.AuthenticateAsClient($hostname)
+            $tls.AuthenticateAsClient($hostname, $null, [Security.Authentication.SslProtocols]::Tls12, $true)
             if ($tls.RemoteCertificate.GetCertHashString() -ne $certificate.Thumbprint) {
                 throw 'The live RDP listener presented a different certificate.'
             }

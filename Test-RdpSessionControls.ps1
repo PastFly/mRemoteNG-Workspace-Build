@@ -2,6 +2,8 @@
 # native control. Querying a complete UIA subtree containing a live desktop
 # can cross into the remote session and block for a minute.
 function Get-FixtureControls($Window, [string[]] $Names) {
+    $showInspector = Find-Name $Window 'Показать свойства' -Type ([Windows.Automation.ControlType]::Button) -Optional
+    if ($showInspector) { $showInspector.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke() }
     $items = @{}
     foreach ($name in $Names) {
         $item = Find-Name $Window $name -Type ([Windows.Automation.ControlType]::TreeItem)
