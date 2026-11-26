@@ -4,6 +4,7 @@ param([Parameter(Mandatory)][string] $Exe)
 Write-Host 'Loading installed-app UI automation helpers.'
 . (Join-Path $PSScriptRoot 'Test-Rdp030.ps1') -Exe $Exe -OnlyHelpers
 . (Join-Path $PSScriptRoot 'Test-RdpSessionControls.ps1')
+. (Join-Path $PSScriptRoot 'Test-RdpNativeComparison.ps1')
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
     throw 'The RDP fixture is limited to disposable hosted Windows runners.'
 }
@@ -181,7 +182,13 @@ try {
             $users = (& quser.exe) -join [Environment]::NewLine
             $active = $users -match ('(?im)^\s*>?\s*' + $accountNames[$i] + '\s+.*\bActive\b')
         }
-        if (!$active) { throw "$name did not complete Windows logon within 35 seconds." }
+        if (!$active) {
+            Write-Host 'Checking the same target with the inbox Remote Desktop Connection client.'
+            # Use a separate identity so any session counted here belongs to mstsc.
+            $reference = if ($i -eq 0) { $accountNames[1] } else { $accountNames[0] }
+            if ($i -eq 0) { Test-RdpNativeComparison $hostname $reference $password }
+            throw "$name did not complete Windows logon within 35 seconds."
+        }
         Write-Host "$name completed Windows logon."
     }
     Select-FixtureTabs $window $names
