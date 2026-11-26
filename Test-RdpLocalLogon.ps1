@@ -25,9 +25,11 @@ $app = $null
 $createdUsers = [System.Collections.Generic.List[string]]::new()
 
 try {
-    $externalAddresses = @(Get-NetIPAddress -AddressState Preferred | Where-Object {
-        ![Net.IPAddress]::IsLoopback([Net.IPAddress]::Parse($_.IPAddress))
-    } | Select-Object -ExpandProperty IPAddress -Unique)
+    $externalAddresses = @(Get-NetIPAddress -AddressState Preferred | ForEach-Object {
+        $value = [Net.IPAddress]::Parse(($_.IPAddress -split '%')[0])
+        if (![Net.IPAddress]::IsLoopback($value) -and $value -ne [Net.IPAddress]::Any -and
+            $value -ne [Net.IPAddress]::IPv6Any) { $value.ToString() }
+    } | Select-Object -Unique)
     if ($externalAddresses.Count -eq 0) { throw 'Failed to enumerate non-loopback addresses.' }
 
     $rule = @{
