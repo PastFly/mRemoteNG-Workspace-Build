@@ -37,8 +37,12 @@ public static class CatalogTestWindows {
 $store = Join-Path $env:LOCALAPPDATA 'Remote Workspace\catalog.xml'
 
 function Find-Name {
-    param($Scope, [string] $Name, [switch] $Optional)
+    param($Scope, [string] $Name, [switch] $Optional, [Windows.Automation.ControlType] $Type)
     $condition = [Windows.Automation.PropertyCondition]::new($nameProperty, $Name)
+    if ($Type) {
+        $typed = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, $Type)
+        $condition = [Windows.Automation.AndCondition]::new([Windows.Automation.Condition[]]@($condition, $typed))
+    }
     for ($attempt = 0; $attempt -lt $(if ($Optional) { 1 } else { 60 }); $attempt++) {
         $element = $Scope.FindFirst($tree, $condition)
         if ($null -ne $element) { return $element }
@@ -49,12 +53,12 @@ function Find-Name {
 
 function Invoke-Control {
     param($Scope, [string] $Name)
-    (Find-Name $Scope $Name).GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+    (Find-Name $Scope $Name -Type ([Windows.Automation.ControlType]::Button)).GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
 }
 
 function Set-Control {
     param($Scope, [string] $Name, [string] $Value)
-    (Find-Name $Scope $Name).GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue($Value)
+    (Find-Name $Scope $Name -Type ([Windows.Automation.ControlType]::Edit)).GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue($Value)
 }
 
 function Find-Dialog {
@@ -151,7 +155,7 @@ function Import-Fixture {
     Invoke-Control $Window 'Подключить SQL Server'
     Set-Control $Window 'Сервер SQL' $Fixture.Instance
     Set-Control $Window 'База SQL' $Fixture.Database
-    $trust = (Find-Name $Window 'Доверять сертификату для этой загрузки').GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
+    $trust = (Find-Name $Window 'Доверять сертификату для этой загрузки' -Type ([Windows.Automation.ControlType]::CheckBox)).GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
     if ($trust.Current.ToggleState -ne [Windows.Automation.ToggleState]::Off) { throw 'Certificate validation is not on by default.' }
     $trust.Toggle()
     Invoke-Control $Window 'Загрузить каталог'
@@ -199,7 +203,7 @@ try {
 
     Invoke-Control $window 'Изменить подключение'
     $editor = Find-Dialog $app.Process 'Редактирование подключения'
-    $box = Find-Name $editor 'Протокол'
+    $box = Find-Name $editor 'Протокол' -Type ([Windows.Automation.ControlType]::ComboBox)
     $box.GetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
     $choice = Find-Name $box 'SSH2'
     $choice.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
