@@ -6,7 +6,34 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Data
 $tree = [Windows.Automation.TreeScope]::Descendants
 $nameProperty = [Windows.Automation.AutomationElement]::NameProperty
-$desktop = [Windows.Automation.AutomationElement]::RootElement
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+
+public static class CatalogTestWindows {
+    private delegate bool Callback(IntPtr window, IntPtr param);
+    [DllImport("user32.dll")] private static extern bool EnumWindows(Callback callback, IntPtr param);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out int pid);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr window, StringBuilder name, int capacity);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
+
+    public static IntPtr Find(int process, string title) {
+        IntPtr found = IntPtr.Zero;
+        EnumWindows((window, param) => {
+            int pid;
+            GetWindowThreadProcessId(window, out pid);
+            if (pid != process || !IsWindowVisible(window)) return true;
+            var value = new StringBuilder(256);
+            GetWindowText(window, value, value.Capacity);
+            if (!String.Equals(value.ToString(), title, StringComparison.Ordinal)) return true;
+            found = window;
+            return false;
+        }, IntPtr.Zero);
+        return found;
+    }
+}
+'@
 $store = Join-Path $env:LOCALAPPDATA 'Remote Workspace\catalog.xml'
 
 function Find-Name {
@@ -32,12 +59,10 @@ function Set-Control {
 
 function Find-Dialog {
     param($Process, [string] $Title)
-    $a = [Windows.Automation.PropertyCondition]::new($nameProperty, $Title)
-    $b = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty, $Process.Id)
-    $condition = [Windows.Automation.AndCondition]::new($a, $b)
     for ($attempt = 0; $attempt -lt 60; $attempt++) {
-        $found = $desktop.FindFirst([Windows.Automation.TreeScope]::Children, $condition)
-        if ($null -ne $found) { return $found }
+        $handle = [CatalogTestWindows]::Find($Process.Id, $Title)
+        if ($handle -ne [IntPtr]::Zero) { return [Windows.Automation.AutomationElement]::FromHandle($handle) }
+        if ($Process.HasExited) { throw "App exited with code $($Process.ExitCode) while waiting for $Title." }
         Start-Sleep -Milliseconds 200
     }
     throw "Dialog did not appear: $Title"
@@ -144,11 +169,13 @@ function Import-Fixture {
 $app = Open-App
 try {
     $window = $app.Window
+    Write-Host "Installed application window opened."
     Invoke-Control $window 'Создать папку'
     $editor = Find-Dialog $app.Process 'Новая папка'
     Set-Control $editor 'Название папки' 'QA Root'
     Invoke-Control $editor 'Сохранить'
     $null = Read-CatalogDocument 'QA Root'
+    Write-Host 'Created the root folder.'
 
     Invoke-Control $window 'Создать папку'
     $editor = Find-Dialog $app.Process 'Новая папка'
@@ -158,6 +185,7 @@ try {
     $root = $doc.Catalog.Folders.SelectSingleNode("Folder[Name='QA Root']")
     $nested = $doc.Catalog.Folders.SelectSingleNode("Folder[Name='QA Nested']")
     if (!$root -or !$nested -or $nested.ParentId -ne $root.Id) { throw 'The new folder hierarchy was not saved.' }
+    Write-Host 'Created the nested folder.'
 
     Invoke-Control $window 'Создать подключение'
     $editor = Find-Dialog $app.Process 'Новое подключение'
@@ -167,6 +195,7 @@ try {
     $doc = Read-CatalogDocument 'rdp-fixture.example'
     $profile = $doc.Catalog.Profiles.SelectSingleNode("Profile[Name='QA profile']")
     if (!$profile -or $profile.FolderId -ne $nested.Id -or $profile.Protocol -ne 'RDP') { throw 'New connection was not saved.' }
+    Write-Host 'Created the connection.'
 
     Invoke-Control $window 'Изменить подключение'
     $editor = Find-Dialog $app.Process 'Редактирование подключения'
@@ -201,6 +230,10 @@ try {
     Set-Control $window 'Поиск подключений' ''
     $null = Find-Name $window 'Показано 2 из 2'
     Write-Host 'Windows checks passed: nested folders, profile creation, protocol and port editing, SQL import, repeat import, search and persistence across restart.'
+    Stop-App $app
+} catch {
+    Write-Host "Test failure: $_"
+    throw
 } finally {
-    if (!$app.Process.HasExited) { Stop-App $app }
+    if (!$app.Process.HasExited) { Stop-Process -Id $app.Process.Id -Force -ErrorAction SilentlyContinue }
 }
