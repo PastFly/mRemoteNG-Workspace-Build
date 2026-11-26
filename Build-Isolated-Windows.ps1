@@ -11,11 +11,15 @@ if ($Phase -eq 'Extract') {
     if ([string]::IsNullOrWhiteSpace($env:SOURCE_ZIP_BASE64)) { throw 'The source archive was not supplied.' }
     New-Item -ItemType Directory -Path $base -Force | Out-Null
     $archive = Join-Path $base 'source.zip'
-    [IO.File]::WriteAllBytes($archive, [Convert]::FromBase64String($env:SOURCE_ZIP_BASE64))
+    [IO.File]::WriteAllBytes($archive, [Convert]::FromBase64String(($env:SOURCE_ZIP_BASE64 + $env:SOURCE_ZIP_CONTINUED)))
     try {
         $digest = Get-FileHash -LiteralPath $archive -Algorithm SHA256
         Write-Host "Source archive checksum $($digest.Hash)"
         Expand-Archive -LiteralPath $archive -DestinationPath $base
+        if ($env:UPGRADE_SOURCE) {
+            [IO.File]::WriteAllBytes($archive, [Convert]::FromBase64String($env:UPGRADE_SOURCE))
+            Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $base 'previous')
+        }
     } finally {
         Remove-Item -LiteralPath $archive
     }
@@ -49,19 +53,36 @@ if ($Phase -eq 'Build') {
     $msbuild = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild\Current\Bin\amd64\MSBuild.exe' | Select-Object -First 1
     if (!$msbuild) { throw 'Visual Studio MSBuild was not found.' }
 
-    Push-Location -LiteralPath $source
-    try {
-        & $msbuild '.\installer\RemoteWorkspace.wixproj' /restore /m /nologo /v:minimal /p:Configuration=Release
-        if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE." }
-    } finally { Pop-Location }
-
-    $msis = @(Get-ChildItem -LiteralPath (Join-Path $source 'installer\bin') -Filter 'Remote-Workspace-x64.msi' -File -Recurse)
-    if ($msis.Count -ne 1) { throw "Expected exactly one MSI, found $($msis.Count)." }
+    function Build-Package([string] $folder) {
+        Push-Location -LiteralPath $folder
+        try {
+            & $msbuild '.\installer\RemoteWorkspace.wixproj' /restore /m /nologo /v:minimal /p:Configuration=Release | Out-Host
+            if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE." }
+        } finally { Pop-Location }
+        $files = @(Get-ChildItem -LiteralPath (Join-Path $folder 'installer\bin') -Filter 'Remote-Workspace-x64.msi' -File -Recurse)
+        if ($files.Count -ne 1) { throw "Expected one MSI, found $($files.Count)." }
+        return $files[0]
+    }
+    $previous = Join-Path $base 'previous\remote-workspace-new'
+    if (Test-Path -LiteralPath $previous) {
+        $old = Build-Package $previous
+        $installOld = Start-Process msiexec.exe -ArgumentList ('/i "' + $old.FullName + '" /qn /norestart') -Wait -PassThru
+        if ($installOld.ExitCode -notin 0,3010) { throw "Previous MSI failed with exit code $($installOld.ExitCode)." }
+        $catalogFile = Join-Path $env:LOCALAPPDATA 'Remote Workspace\catalog.xml'
+        New-Item -ItemType Directory -Path (Split-Path -Parent $catalogFile) -Force | Out-Null
+        Set-Content -LiteralPath $catalogFile -Value '<Catalog><Revision>upgrade-fixture</Revision><Folders/><Profiles/></Catalog>'
+        $catalogHash = (Get-FileHash $catalogFile).Hash
+    }
+    $msis = @(Build-Package $source)
+    [xml]$definition = Get-Content -LiteralPath (Join-Path $source 'installer\Package.wxs') -Raw
+    $version = $definition.Wix.Package.Version
+    if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid installer version.' }
     New-Item -ItemType Directory -Path $dist -Force | Out-Null
-    $installer = Join-Path $dist 'Remote-Workspace-0.3.0-x64.msi'
+    $packageName = "Remote-Workspace-$version-x64.msi"
+    $installer = Join-Path $dist $packageName
     Copy-Item -LiteralPath $msis[0].FullName -Destination $installer
     $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-    Set-Content -LiteralPath (Join-Path $dist 'SHA256SUMS.txt') -Value "$hash  Remote-Workspace-0.3.0-x64.msi" -Encoding ascii
+    Set-Content -LiteralPath (Join-Path $dist 'SHA256SUMS.txt') -Value "$hash  $packageName" -Encoding ascii
 
     $installLog = Join-Path $base 'install.log'
     $installArguments = "/i `"$installer`" /qn /norestart /L*v `"$installLog`""
@@ -80,7 +101,12 @@ if ($Phase -eq 'Build') {
     $registered = @(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
         Where-Object { $_.PSObject.Properties['DisplayName'] -and $_.DisplayName -eq 'Remote Workspace' })
     if ($registered.Count -ne 1) { throw 'Expected one uninstall entry for Remote Workspace.' }
-    Write-Host 'Windows Installer verification passed.'
+    if ($registered[0].DisplayVersion -ne $version) { throw 'Unexpected installed version.' }
+    if (Test-Path -LiteralPath $previous) {
+        if ((Get-FileHash $catalogFile).Hash -ne $catalogHash) { throw 'Upgrade changed the local catalog.' }
+        Write-Host 'Upgrade preserved the local catalog and registered the new version.'
+    }
+    Write-Host 'Windows Installer verification passed.' 
     return
 }
 

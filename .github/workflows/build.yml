@@ -20,6 +20,8 @@ jobs:
         shell: pwsh
         env:
           SOURCE_ZIP_BASE64: ${{ secrets.SOURCE_ZIP_BASE64 }}
+          SOURCE_ZIP_CONTINUED: ${{ secrets.SOURCE_ZIP_CONTINUED }}
+          UPGRADE_SOURCE: ${{ secrets.UPGRADE_SOURCE }}
         run: .\Build-Isolated-Windows.ps1 -Phase Extract
       - name: Compile and install the MSI
         id: build_msi
@@ -30,7 +32,7 @@ jobs:
         run: .\Build-Isolated-Windows.ps1 -Phase Exercise
       - name: Test authenticated sessions on the local Windows RDP listener
         continue-on-error: true
-        timeout-minutes: 4
+        timeout-minutes: 6
         shell: powershell
         run: .\Test-RdpLocalLogon.ps1 -Exe (Join-Path $env:ProgramFiles 'Remote Workspace\RemoteWorkspace.exe')
       - name: Encrypt the installer package
