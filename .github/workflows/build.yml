@@ -31,6 +31,7 @@ jobs:
         shell: powershell
         run: .\Build-Isolated-Windows.ps1 -Phase Exercise
       - name: Test authenticated sessions on the local Windows RDP listener
+        if: ${{ !cancelled() && steps.build_msi.outcome == 'success' }}
         continue-on-error: true
         timeout-minutes: 6
         shell: powershell

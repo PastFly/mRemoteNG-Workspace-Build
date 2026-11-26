@@ -21,6 +21,19 @@ public static class CatalogTestWindows {
     [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
 
+    [DllImport("user32.dll")] public static extern void keybd_event(byte key, byte scancode, uint flags, UIntPtr extra);
+    [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hwnd);
+    [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hwnd, IntPtr dc);
+    [DllImport("gdi32.dll")] private static extern uint GetPixel(IntPtr dc, int x, int y);
+    public static int Brightness(int x, int y) {
+        IntPtr dc = GetDC(IntPtr.Zero);
+        try {
+            uint color = GetPixel(dc, x, y);
+            if (color == 0xffffffff) throw new InvalidOperationException("Could not sample visible desktop.");
+            return (int)((color & 255) + ((color >> 8) & 255) + ((color >> 16) & 255));
+        } finally { ReleaseDC(IntPtr.Zero, dc); }
+    }
+
     public static IntPtr Find(int process, string title) {
         IntPtr found = IntPtr.Zero;
         EnumWindows((window, param) => {
@@ -52,6 +65,58 @@ function Find-Name {
         if (!$Optional) { Start-Sleep -Milliseconds 200 }
     }
     if (!$Optional) { throw "Missing UI element: $Name" }
+}
+
+function Find-ControlId {
+    param($Window, [string] $Id)
+    $condition = [Windows.Automation.PropertyCondition]::new(
+        [Windows.Automation.AutomationElement]::AutomationIdProperty, $Id)
+    $control = $Window.FindFirst($tree, $condition)
+    if ($null -eq $control) { throw "Missing UI element with AutomationId $Id" }
+    return $control
+}
+
+function Invoke-ControlId {
+    param($Window, [string] $Id)
+    (Find-ControlId $Window $Id).GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+}
+
+function Maximize-Window {
+    param($Window)
+    [void] [CatalogTestWindows]::SetForegroundWindow([IntPtr]$Window.Current.NativeWindowHandle)
+    $Window.GetCurrentPattern([Windows.Automation.WindowPattern]::Pattern).SetWindowVisualState(
+        [Windows.Automation.WindowVisualState]::Maximized)
+    Start-Sleep -Milliseconds 350
+}
+
+function Resize-Panel {
+    param($Window, [string] $Id, [int] $Delta)
+    $splitter = Find-ControlId $Window $Id
+    $bounds = $splitter.Current.BoundingRectangle
+    $x = [int]($bounds.X + $bounds.Width / 2)
+    $y = [int]($bounds.Top + $bounds.Height / 3)
+    [void] [CatalogTestWindows]::SetCursorPos($x, $y)
+    [CatalogTestWindows]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero)
+    try {
+        foreach ($step in 1..6) {
+            [void] [CatalogTestWindows]::SetCursorPos(($x + $Delta * $step / 6), $y)
+            Start-Sleep -Milliseconds 60
+        }
+    } finally {
+        [CatalogTestWindows]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero)
+    }
+    Start-Sleep -Milliseconds 200
+    $position = $splitter.Current.BoundingRectangle.X
+    if (($position - $bounds.X) * [Math]::Sign($Delta) -lt 12) {
+        throw "$Id did not move with the pointer ($($bounds.X) to $position)."
+    }
+    return $position
+}
+
+function Get-StageBrightness {
+    param($Window)
+    $bounds = (Find-ControlId $Window 'TreeSplitter').Current.BoundingRectangle
+    return [CatalogTestWindows]::Brightness(($bounds.Right + 20), ($bounds.Top + 90))
 }
 
 function Invoke-Control {
@@ -112,7 +177,7 @@ function Wait-Tcp {
 }
 
 function Move-TreeItem {
-    param($Window, $Source, $Target)
+    param($Window, $Source, $Target, [switch]$Cancel)
     [void] [CatalogTestWindows]::SetForegroundWindow([IntPtr] $Window.Current.NativeWindowHandle)
     $from = $Source.Current.BoundingRectangle
     $to = $Target.Current.BoundingRectangle
@@ -127,6 +192,16 @@ function Move-TreeItem {
         for ($step = 1; $step -le 8; $step++) {
             [void] [CatalogTestWindows]::SetCursorPos($x1 + (($x2 - $x1) * $step / 8), $y1 + (($y2 - $y1) * $step / 8))
             Start-Sleep -Milliseconds 65
+        }
+        $status = Find-ControlId $Window 'Status'
+        $feedback = $status.Current.Name
+        if ($feedback -notlike '*QA RDP One*QA Target*') {
+            throw "Drag destination hint missing before drop: $feedback"
+        }
+        if ($Cancel) {
+            [CatalogTestWindows]::keybd_event(27, 0, 0, [UIntPtr]::Zero)
+            [CatalogTestWindows]::keybd_event(27, 0, 2, [UIntPtr]::Zero)
+            Start-Sleep -Milliseconds 100
         }
     } finally {
         [CatalogTestWindows]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero)
@@ -178,11 +253,12 @@ try {
   <Revision>fixture</Revision>
   <Folders>
     <Folder><Id>qa-source</Id><ParentId></ParentId><Name>QA Source</Name><SmartCardPolicy>true</SmartCardPolicy><SmartCardPolicySet>true</SmartCardPolicySet></Folder>
+    <Folder><Id>qa-nested</Id><ParentId>qa-source</ParentId><Name>QA Nested</Name></Folder>
     <Folder><Id>qa-target</Id><ParentId></ParentId><Name>QA Target</Name></Folder>
   </Folders>
   <Profiles>
     <Profile><Id>qa-one</Id><FolderId>qa-source</FolderId><Name>QA RDP One</Name><Host>127.0.0.1</Host><Protocol>RDP</Protocol><Port>$portOne</Port><User>Fixture</User><ProtectedPassword>$credential</ProtectedPassword><InheritSmartCards>true</InheritSmartCards></Profile>
-    <Profile><Id>qa-two</Id><FolderId>qa-source</FolderId><Name>QA RDP Two</Name><Host>127.0.0.1</Host><Protocol>RDP</Protocol><Port>$portTwo</Port><User>Fixture</User><ProtectedPassword>$credential</ProtectedPassword></Profile>
+    <Profile><Id>qa-two</Id><FolderId>qa-nested</FolderId><Name>QA RDP Two</Name><Host>127.0.0.1</Host><Protocol>RDP</Protocol><Port>$portTwo</Port><User>Fixture</User><ProtectedPassword>$credential</ProtectedPassword></Profile>
   </Profiles>
 </Catalog>
 "@ | Set-Content -LiteralPath $store -Encoding UTF8
@@ -191,8 +267,31 @@ try {
     Write-Host 'Application with the RDP ActiveX dependencies launched.'
     $treeItem = [Windows.Automation.ControlType]::TreeItem
     $tabItem = [Windows.Automation.ControlType]::ListItem
+    Maximize-Window $window
+    Invoke-ControlId $window 'ExpandAllButton'
+    $null = Find-Name $window 'QA RDP Two' -Type $treeItem
+    Invoke-ControlId $window 'CollapseAllButton'
     $branch = Find-Name $window 'QA Source' -Type $treeItem
-    $branch.GetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
+    $expand = $branch.GetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern)
+    if ($expand.Current.ExpandCollapseState -ne [Windows.Automation.ExpandCollapseState]::Collapsed) {
+        throw 'Collapse all left a folder open.'
+    }
+    $expand.Expand()
+    $nested = Find-Name $window 'QA Nested' -Type $treeItem
+    if ($nested.GetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern).Current.ExpandCollapseState -ne
+            [Windows.Automation.ExpandCollapseState]::Collapsed) { throw 'Collapse all left a nested folder open.' }
+    Invoke-ControlId $window 'ExpandAllButton'
+    $null = Find-Name $window 'QA RDP Two' -Type $treeItem
+    Write-Host 'Expand all and collapse all changed both levels of the tree.'
+
+    $light = Get-StageBrightness $window
+    Invoke-ControlId $window 'ThemeToggle'
+    Start-Sleep -Milliseconds 250
+    $dark = Get-StageBrightness $window
+    if ($light - $dark -lt 180) { throw "Dark theme did not repaint the session workspace ($light to $dark)." }
+    $leftPosition = Resize-Panel $window 'TreeSplitter' -26
+    $rightPosition = Resize-Panel $window 'InspectorSplitter' 26
+    Write-Host 'Dark theme repainted the workspace and both side panels resized via their splitters.'
     $null = Select-Item $window 'QA RDP One' $treeItem
     $null = Find-Name $window 'Разрешено · из папки'
     Invoke-Control $window 'Подключиться'
@@ -217,6 +316,12 @@ try {
     $sourceBranch.GetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
     $source = Find-Name $window 'QA RDP One' -Type $treeItem
     $destination = Find-Name $window 'QA Target' -Type $treeItem
+    Move-TreeItem $window $source $destination -Cancel
+    $document = [xml] (Get-Content -LiteralPath $store -Raw)
+    if ($document.Catalog.Profiles.SelectSingleNode("Profile[Id='qa-one']").FolderId -ne 'qa-source' -or
+        (Find-ControlId $window 'Status').Current.Name -like '*QA RDP One*QA Target*') {
+        throw 'Cancelling a drag changed the folder or left the destination hint visible.'
+    }
     Move-TreeItem $window $source $destination
     $deadline = [DateTime]::UtcNow.AddSeconds(7)
     do {
@@ -229,7 +334,24 @@ try {
     Open-TreeContextMenu $window $source $app.Process.Id
     $null = Find-Name $window 'QA RDP One (копия)' -Type $treeItem
     Write-Host 'Dragging persisted the new folder, and right-click duplicate created a second profile.'
+    Invoke-Control $window 'Скрыть свойства'
     Stop-App $app
+    $app = Open-App
+    $window = $app.Window
+    Maximize-Window $window
+    $null = Find-Name $window 'Показать свойства' -Type ([Windows.Automation.ControlType]::Button)
+    if ([Math]::Abs((Get-StageBrightness $window) - $dark) -gt 30) { throw 'The dark theme was lost on restart.' }
+    Invoke-Control $window 'Показать свойства'
+    Start-Sleep -Milliseconds 200
+    if ([Math]::Abs((Find-ControlId $window 'TreeSplitter').Current.BoundingRectangle.X - $leftPosition) -gt 4 -or
+        [Math]::Abs((Find-ControlId $window 'InspectorSplitter').Current.BoundingRectangle.X - $rightPosition) -gt 4) {
+        throw 'The resized side panels did not restore their saved widths after restart.'
+    }
+    Invoke-ControlId $window 'ThemeToggle'
+    Start-Sleep -Milliseconds 200
+    if ([Math]::Abs((Get-StageBrightness $window) - $light) -gt 30) { throw 'Switching back to light did not repaint the workspace.' }
+    Stop-App $app
+    Write-Host 'Windows UI checks passed: theme switch and restart, splitter resizing and restoration, drag destination feedback, Escape and completed drop.'
     Write-Host 'Windows checks passed: RDP transports and tab switching, smart-card inheritance, collapsible inspector and tree search.'
 } catch {
     Write-Host "Test failure: $_"
