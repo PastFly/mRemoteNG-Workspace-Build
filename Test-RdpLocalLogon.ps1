@@ -25,6 +25,11 @@ $app = $null
 $createdUsers = [System.Collections.Generic.List[string]]::new()
 
 try {
+    $externalAdapters = @(Get-NetAdapter -IncludeHidden | Where-Object {
+        $_.Status -eq 'Up' -and $_.InterfaceDescription -notmatch 'Loopback'
+    } | Select-Object -ExpandProperty Name)
+    if ($externalAdapters.Count -eq 0) { throw 'Failed to enumerate the runner network adapters.' }
+
     $rule = @{
         DisplayName = $firewallName
         Direction = 'Inbound'
@@ -32,8 +37,10 @@ try {
         LocalPort = $port
         Action = 'Block'
         Profile = 'Any'
-        RemoteAddress = @('0.0.0.0-126.255.255.255', '128.0.0.0-255.255.255.255', '::/0')
+        InterfaceAlias = $externalAdapters
     }
+    New-NetFirewallRule @rule | Out-Null
+    $rule.Protocol = 'UDP'
     New-NetFirewallRule @rule | Out-Null
     Add-Content -LiteralPath $hosts -Value ([Environment]::NewLine + "127.0.0.1 $hostname") -Encoding ASCII
     if (!([Net.Dns]::GetHostAddresses($hostname) | Where-Object { $_.ToString() -eq '127.0.0.1' })) {
