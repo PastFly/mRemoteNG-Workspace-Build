@@ -58,10 +58,10 @@ if ($Phase -eq 'Build') {
     $msis = @(Get-ChildItem -LiteralPath (Join-Path $source 'installer\bin') -Filter 'Remote-Workspace-x64.msi' -File -Recurse)
     if ($msis.Count -ne 1) { throw "Expected exactly one MSI, found $($msis.Count)." }
     New-Item -ItemType Directory -Path $dist -Force | Out-Null
-    $installer = Join-Path $dist 'Remote-Workspace-0.1.0-x64.msi'
+    $installer = Join-Path $dist 'Remote-Workspace-0.1.1-x64.msi'
     Copy-Item -LiteralPath $msis[0].FullName -Destination $installer
     $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-    Set-Content -LiteralPath (Join-Path $dist 'SHA256SUMS.txt') -Value "$hash  Remote-Workspace-0.1.0-x64.msi" -Encoding ascii
+    Set-Content -LiteralPath (Join-Path $dist 'SHA256SUMS.txt') -Value "$hash  Remote-Workspace-0.1.1-x64.msi" -Encoding ascii
 
     $installLog = Join-Path $base 'install.log'
     $installArguments = "/i `"$installer`" /qn /norestart /L*v `"$installLog`""
@@ -119,12 +119,21 @@ try {
     $search = Find-UiText $window 'Поиск подключений'
     if ($null -eq $search) { throw 'The catalog search field was not found.' }
     $valuePattern = $search.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern)
-    $valuePattern.SetValue('monitor.example')
+    $valuePattern.SetValue('app-01.example')
     Start-Sleep -Milliseconds 600
     if ($null -eq (Find-UiText $window 'Показано 1 из 5')) { throw 'Search did not filter the demonstration catalog.' }
     $valuePattern.SetValue('')
     Start-Sleep -Milliseconds 600
     if ($null -eq (Find-UiText $window 'Показано 5 из 5')) { throw 'Clearing search did not restore the catalog.' }
+
+    $sqlButton = Find-UiText $window 'Подключить SQL Server'
+    if ($null -eq $sqlButton) { throw 'The SQL Server settings button was not found.' }
+    $sqlButton.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+    Start-Sleep -Milliseconds 300
+    $close = Find-UiText $window 'Закрыть'
+    if ($null -eq $close) { throw 'The SQL Server settings dialog did not open.' }
+    $close.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+    Start-Sleep -Milliseconds 300
 
     $rect = [WindowCapture+Rect]::new()
     if (![WindowCapture]::GetWindowRect($hwnd, [ref] $rect)) { throw 'Failed to read the window bounds.' }
@@ -135,14 +144,14 @@ try {
         try {
             if (![WindowCapture]::PrintWindow($hwnd, $dc, 2)) { throw 'Failed to capture the window.' }
         } finally { $graphics.ReleaseHdc($dc) }
-        $bitmap.Save((Join-Path $dist 'Remote-Workspace-0.1.0-Windows.png'), [Drawing.Imaging.ImageFormat]::Png)
+        $bitmap.Save((Join-Path $dist 'Remote-Workspace-0.1.1-Windows.png'), [Drawing.Imaging.ImageFormat]::Png)
     } finally {
         $graphics.Dispose()
         $bitmap.Dispose()
     }
 
     if (!$process.CloseMainWindow() -or !$process.WaitForExit(10000)) { throw 'The application did not close cleanly.' }
-    Write-Host 'Windows smoke test passed: MSI installed, app launched, search filtered the catalog and cleared correctly.'
+    Write-Host 'Windows smoke test passed: MSI installed, app launched, search filtered the catalog and SQL settings opened.'
 } finally {
     if (!$process.HasExited) { Stop-Process -Id $process.Id -Force }
 }
