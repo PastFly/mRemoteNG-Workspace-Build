@@ -58,10 +58,10 @@ if ($Phase -eq 'Build') {
     $msis = @(Get-ChildItem -LiteralPath (Join-Path $source 'installer\bin') -Filter 'Remote-Workspace-x64.msi' -File -Recurse)
     if ($msis.Count -ne 1) { throw "Expected exactly one MSI, found $($msis.Count)." }
     New-Item -ItemType Directory -Path $dist -Force | Out-Null
-    $installer = Join-Path $dist 'Remote-Workspace-0.1.1-x64.msi'
+    $installer = Join-Path $dist 'Remote-Workspace-0.2.0-x64.msi'
     Copy-Item -LiteralPath $msis[0].FullName -Destination $installer
     $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-    Set-Content -LiteralPath (Join-Path $dist 'SHA256SUMS.txt') -Value "$hash  Remote-Workspace-0.1.1-x64.msi" -Encoding ascii
+    Set-Content -LiteralPath (Join-Path $dist 'SHA256SUMS.txt') -Value "$hash  Remote-Workspace-0.2.0-x64.msi" -Encoding ascii
 
     $installLog = Join-Path $base 'install.log'
     $installArguments = "/i `"$installer`" /qn /norestart /L*v `"$installLog`""
@@ -80,78 +80,4 @@ if ($Phase -eq 'Build') {
 }
 
 $exe = Join-Path $env:ProgramFiles 'Remote Workspace\RemoteWorkspace.exe'
-Add-Type -AssemblyName System.Drawing
-Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
-Add-Type @'
-using System;
-using System.Runtime.InteropServices;
-
-public static class WindowCapture {
-    [StructLayout(LayoutKind.Sequential)]
-    public struct Rect { public int Left, Top, Right, Bottom; }
-    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
-    [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
-}
-'@
-
-function Find-UiText {
-    param($Window, [string] $Name)
-    $prop = [Windows.Automation.AutomationElement]::NameProperty
-    $condition = [Windows.Automation.PropertyCondition]::new($prop, $Name)
-    $Window.FindFirst([Windows.Automation.TreeScope]::Descendants, $condition)
-}
-
-$process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) -PassThru
-try {
-    $hwnd = [IntPtr]::Zero
-    for ($attempt = 0; $attempt -lt 25; $attempt++) {
-        Start-Sleep -Seconds 1
-        $process.Refresh()
-        if ($process.HasExited) { throw "The installed application exited with code $($process.ExitCode)." }
-        if ($process.MainWindowTitle -eq 'Remote Workspace') {
-            $hwnd = $process.MainWindowHandle
-            break
-        }
-    }
-    if ($hwnd -eq [IntPtr]::Zero) { throw 'The application window did not appear.' }
-
-    $window = [Windows.Automation.AutomationElement]::FromHandle($hwnd)
-    $search = Find-UiText $window 'Поиск подключений'
-    if ($null -eq $search) { throw 'The catalog search field was not found.' }
-    $valuePattern = $search.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern)
-    $valuePattern.SetValue('app-01.example')
-    Start-Sleep -Milliseconds 600
-    if ($null -eq (Find-UiText $window 'Показано 1 из 5')) { throw 'Search did not filter the demonstration catalog.' }
-    $valuePattern.SetValue('')
-    Start-Sleep -Milliseconds 600
-    if ($null -eq (Find-UiText $window 'Показано 5 из 5')) { throw 'Clearing search did not restore the catalog.' }
-
-    $sqlButton = Find-UiText $window 'Подключить SQL Server'
-    if ($null -eq $sqlButton) { throw 'The SQL Server settings button was not found.' }
-    $sqlButton.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
-    Start-Sleep -Milliseconds 300
-    $close = Find-UiText $window 'Закрыть'
-    if ($null -eq $close) { throw 'The SQL Server settings dialog did not open.' }
-    $close.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
-    Start-Sleep -Milliseconds 300
-
-    $rect = [WindowCapture+Rect]::new()
-    if (![WindowCapture]::GetWindowRect($hwnd, [ref] $rect)) { throw 'Failed to read the window bounds.' }
-    $bitmap = [Drawing.Bitmap]::new(($rect.Right - $rect.Left), ($rect.Bottom - $rect.Top))
-    $graphics = [Drawing.Graphics]::FromImage($bitmap)
-    try {
-        $dc = $graphics.GetHdc()
-        try {
-            if (![WindowCapture]::PrintWindow($hwnd, $dc, 2)) { throw 'Failed to capture the window.' }
-        } finally { $graphics.ReleaseHdc($dc) }
-        $bitmap.Save((Join-Path $dist 'Remote-Workspace-0.1.1-Windows.png'), [Drawing.Imaging.ImageFormat]::Png)
-    } finally {
-        $graphics.Dispose()
-        $bitmap.Dispose()
-    }
-
-    if (!$process.CloseMainWindow() -or !$process.WaitForExit(10000)) { throw 'The application did not close cleanly.' }
-    Write-Host 'Windows smoke test passed: MSI installed, app launched, search filtered the catalog and SQL settings opened.'
-} finally {
-    if (!$process.HasExited) { Stop-Process -Id $process.Id -Force }
-}
+& (Join-Path $PSScriptRoot 'Test-Catalog020.ps1') -Exe $exe
