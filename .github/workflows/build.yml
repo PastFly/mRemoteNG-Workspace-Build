@@ -2,6 +2,11 @@ name: Build a Windows installer
 
 on:
   workflow_dispatch:
+    inputs:
+      windows_loopback:
+        description: Also compare the local Windows RDP listener
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -31,7 +36,7 @@ jobs:
         shell: powershell
         run: .\Build-Isolated-Windows.ps1 -Phase Exercise
       - name: Test authenticated sessions on the local Windows RDP listener
-        if: ${{ !cancelled() && steps.build_msi.outcome == 'success' }}
+        if: ${{ inputs.windows_loopback && !cancelled() && steps.build_msi.outcome == 'success' }}
         continue-on-error: true
         timeout-minutes: 6
         shell: powershell

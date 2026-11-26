@@ -15,6 +15,7 @@ $hosts = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
 $originalHosts = [IO.File]::ReadAllBytes($hosts)
 $certificate = $null
 $app = $null
+$server = $null
 $imported = $false
 function Run-Linux([string[]] $Arguments) {
     & $wsl -d $distro -u root --exec @Arguments
@@ -48,14 +49,26 @@ try {
     $public = (Run-Linux -Arguments @('/bin/cat','/etc/xrdp/qa-cert.pem')) -join [Environment]::NewLine
     $publicFile = Join-Path $folder 'linux-server.cer'
     [IO.File]::WriteAllText($publicFile, $public, [Text.Encoding]::ASCII)
+    Write-Host 'Trusting the generated fixture TLS certificate.'
     $certificate = Import-Certificate -FilePath $publicFile -CertStoreLocation 'Cert:\LocalMachine\Root'
     Add-Content -LiteralPath $hosts -Value ([Environment]::NewLine + "127.0.0.1 $endpoint") -Encoding ASCII
     $ips = [Net.Dns]::GetHostAddresses($endpoint)
     if ($ips.Count -ne 1 -or ![Net.IPAddress]::IsLoopback($ips[0])) { throw 'Fixture DNS must resolve to loopback.' }
-    Run-Linux -Arguments @('/usr/sbin/xrdp-sesman')
-    Run-Linux -Arguments @('/usr/sbin/xrdp')
-    $listener = Get-NetTCPConnection -State Listen -LocalPort $port
-    if ($listener.LocalAddress -ne '127.0.0.1') { throw 'Unexpected WSL RDP listener address.' }
+    Write-Host 'Starting xrdp and sesman under an independent WSL supervisor.'
+    $server = Start-Process -FilePath $wsl -ArgumentList @('-d', $distro, '-u','root','--exec','/bin/bash',('"' + $linuxPath + '"'),'serve') `
+        -RedirectStandardOutput (Join-Path $folder 'daemon.out') -RedirectStandardError (Join-Path $folder 'daemon.err') -PassThru
+    $listening = $false
+    $deadline = [DateTime]::UtcNow.AddSeconds(15)
+    while (!$listening -and [DateTime]::UtcNow -lt $deadline -and !$server.HasExited) {
+        $tcp = [Net.Sockets.TcpClient]::new()
+        try {
+            $connect = $tcp.ConnectAsync([Net.IPAddress]::Loopback, $port)
+            $listening = $connect.Wait(400) -and $tcp.Connected
+        } catch { } finally { $tcp.Dispose() }
+        if (!$listening) { Start-Sleep -Milliseconds 200 }
+    }
+    if (!$listening) { throw 'WSL xrdp did not listen on loopback within 15 seconds.' }
+    Run-Linux -Arguments @('/bin/bash',$linuxPath,'verify-bind')
     Write-Host 'Independent xrdp server is ready on loopback with a trusted TLS certificate.'
 
     $credential = [Convert]::ToBase64String([Security.Cryptography.ProtectedData]::Protect(
@@ -66,10 +79,12 @@ try {
     }
     "<Catalog><Revision>independent-rdp-fixture</Revision><Folders/><Profiles>$profiles</Profiles></Catalog>" |
         Set-Content -LiteralPath $store -Encoding UTF8
+    Write-Host 'Launching the installed client against the independent server.'
     $app = Open-App
     $names = @('rwalpha','rwbeta')
     $controls = Get-FixtureControls $app.Window $names
     foreach ($username in $names) {
+        Write-Host "Opening the $username graphical desktop."
         $controls.Items[$username].Select()
         $controls.Connect.Invoke()
         $ready = $false
@@ -90,8 +105,9 @@ try {
     if (@($displays | Select-Object -Unique).Count -ne 2) { throw 'The users must have independent graphical desktops.' }
     Write-Host 'Verified two simultaneous authenticated xrdp desktops and switching between their installed-app tabs.'
 } catch {
+    Write-Host ('Independent desktop test failed: ' + $_.Exception.Message)
     if ($imported) {
-        & $wsl -d $distro -u root --exec /usr/bin/tail -n 20 /var/log/xrdp.log /var/log/xrdp-sesman.log
+        & $wsl -d $distro -u root --exec /usr/bin/tail -n 20 /var/log/xrdp.log /var/log/xrdp-sesman.log /tmp/rw-xrdp-console.log /tmp/rw-sesman-console.log
     }
     throw
 } finally {
@@ -101,6 +117,10 @@ try {
     }
     [IO.File]::WriteAllBytes($hosts, $originalHosts)
     if ($certificate) { Remove-Item -LiteralPath "Cert:\LocalMachine\Root\$($certificate.Thumbprint)" }
-    if ($imported) { & $wsl --unregister $distro }
+    if ($imported) {
+        & $wsl --terminate $distro
+        & $wsl --unregister $distro
+    }
+    if ($server -and !$server.HasExited) { Stop-Process -Id $server.Id -Force }
     if (Test-Path -LiteralPath $folder) { Remove-Item -LiteralPath $folder -Recurse -Force }
 }

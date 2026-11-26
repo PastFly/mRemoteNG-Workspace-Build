@@ -6,6 +6,23 @@ if [ "${1:-}" = set-passwords ]; then
     LC_ALL=C sed '1s/^\xEF\xBB\xBF//; s/\r$//' | /usr/sbin/chpasswd
     exit
 fi
+if [ "${1:-}" = verify-bind ]; then
+    # Older WSL1 kernels can omit Linux sockets from one or both management APIs.
+    bound=$(ss -H -ltn 2>/dev/null | awk '$4 ~ /:34389$/ {print $4}')
+    if [ -n "$bound" ]; then
+        test "$bound" = '127.0.0.1:34389'
+    fi
+    grep -qxF 'port=tcp://127.0.0.1:34389' /etc/xrdp/xrdp.ini
+    grep -qF 'listening to port 34389 on 127.0.0.1' /var/log/xrdp.log
+    exit
+fi
+if [ "${1:-}" = serve ]; then
+    /usr/sbin/xrdp-sesman --nodaemon </dev/null >/tmp/rw-sesman-console.log 2>&1 &
+    sesman_pid=$!
+    trap 'kill "$sesman_pid" 2>/dev/null || true' EXIT
+    /usr/sbin/xrdp --nodaemon </dev/null >/tmp/rw-xrdp-console.log 2>&1
+    exit
+fi
 export DEBIAN_FRONTEND=noninteractive LC_ALL=C
 printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d
 chmod 755 /usr/sbin/policy-rc.d
