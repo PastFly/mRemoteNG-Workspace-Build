@@ -9,7 +9,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-2022
-    timeout-minutes: 18
+    timeout-minutes: 22
     environment: remote-workspace-msi-20261126
     steps:
       - name: Check out the build scripts
@@ -36,6 +36,12 @@ jobs:
         timeout-minutes: 6
         shell: powershell
         run: .\Test-RdpLocalLogon.ps1 -Exe (Join-Path $env:ProgramFiles 'Remote Workspace\RemoteWorkspace.exe')
+      - name: Test two desktops on an independent loopback RDP server
+        if: ${{ !cancelled() && steps.build_msi.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 7
+        shell: powershell
+        run: .\Test-RdpWslLogon.ps1 -Exe (Join-Path $env:ProgramFiles 'Remote Workspace\RemoteWorkspace.exe')
       - name: Encrypt the installer package
         if: ${{ !cancelled() && steps.build_msi.outcome == 'success' }}
         shell: pwsh
