@@ -28,6 +28,11 @@ jobs:
       - name: Launch and exercise the installed app
         shell: powershell
         run: .\Build-Isolated-Windows.ps1 -Phase Exercise
+      - name: Test authenticated sessions on the local Windows RDP listener
+        continue-on-error: true
+        timeout-minutes: 4
+        shell: powershell
+        run: .\Test-RdpLocalLogon.ps1 -Exe (Join-Path $env:ProgramFiles 'Remote Workspace\RemoteWorkspace.exe')
       - name: Encrypt the installer package
         if: ${{ !cancelled() && steps.build_msi.outcome == 'success' }}
         shell: pwsh

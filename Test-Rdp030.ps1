@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param([Parameter(Mandatory)][string] $Exe)
+param([Parameter(Mandatory)][string] $Exe, [switch] $OnlyHelpers)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -111,6 +111,54 @@ function Wait-Tcp {
     throw "$Name did not initiate its own RDP transport."
 }
 
+function Move-TreeItem {
+    param($Window, $Source, $Target)
+    [void] [CatalogTestWindows]::SetForegroundWindow([IntPtr] $Window.Current.NativeWindowHandle)
+    $from = $Source.Current.BoundingRectangle
+    $to = $Target.Current.BoundingRectangle
+    $x1 = [int] ($from.X + 30)
+    $y1 = [int] ($from.Y + ($from.Height / 2))
+    $x2 = [int] ($to.X + 30)
+    $y2 = [int] ($to.Y + ($to.Height / 2))
+    [void] [CatalogTestWindows]::SetCursorPos($x1, $y1)
+    Start-Sleep -Milliseconds 180
+    [CatalogTestWindows]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero)
+    try {
+        for ($step = 1; $step -le 8; $step++) {
+            [void] [CatalogTestWindows]::SetCursorPos($x1 + (($x2 - $x1) * $step / 8), $y1 + (($y2 - $y1) * $step / 8))
+            Start-Sleep -Milliseconds 65
+        }
+    } finally {
+        [CatalogTestWindows]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero)
+    }
+}
+
+function Open-TreeContextMenu {
+    param($Window, $Item, $ProcessId)
+    [void] [CatalogTestWindows]::SetForegroundWindow([IntPtr] $Window.Current.NativeWindowHandle)
+    $bounds = $Item.Current.BoundingRectangle
+    [void] [CatalogTestWindows]::SetCursorPos($bounds.X + 30, $bounds.Y + ($bounds.Height / 2))
+    Start-Sleep -Milliseconds 150
+    [CatalogTestWindows]::mouse_event(8, 0, 0, 0, [UIntPtr]::Zero)
+    [CatalogTestWindows]::mouse_event(16, 0, 0, 0, [UIntPtr]::Zero)
+    $byName = [Windows.Automation.PropertyCondition]::new($nameProperty, 'Дублировать')
+    $byId = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty, $ProcessId)
+    $byType = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty,
+        [Windows.Automation.ControlType]::MenuItem)
+    $filter = [Windows.Automation.AndCondition]::new([Windows.Automation.Condition[]] @($byName, $byId, $byType))
+    for ($attempt = 0; $attempt -lt 24; $attempt++) {
+        $menu = [Windows.Automation.AutomationElement]::RootElement.FindFirst($tree, $filter)
+        if ($null -ne $menu) {
+            $menu.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+            return
+        }
+        Start-Sleep -Milliseconds 180
+    }
+    throw 'The profile context menu did not open on right-click.'
+}
+
+if ($OnlyHelpers) { return }
+
 $one = New-Object System.Net.Sockets.TcpListener ([Net.IPAddress]::Loopback, 0)
 $two = New-Object System.Net.Sockets.TcpListener ([Net.IPAddress]::Loopback, 0)
 $one.Start()
@@ -165,6 +213,22 @@ try {
     $null = Find-Name $window 'Подключения: 1 из 2'
     Set-Control $window 'Поиск подключений' ''
     $null = Find-Name $window 'Подключения: 2 из 2'
+    $sourceBranch = Find-Name $window 'QA Source' -Type $treeItem
+    $sourceBranch.GetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
+    $source = Find-Name $window 'QA RDP One' -Type $treeItem
+    $destination = Find-Name $window 'QA Target' -Type $treeItem
+    Move-TreeItem $window $source $destination
+    $deadline = [DateTime]::UtcNow.AddSeconds(7)
+    do {
+        Start-Sleep -Milliseconds 250
+        $document = [xml] (Get-Content -LiteralPath $store -Raw)
+        $moved = $document.Catalog.Profiles.SelectSingleNode("Profile[Id='qa-one']")
+    } until ($moved.FolderId -eq 'qa-target' -or [DateTime]::UtcNow -gt $deadline)
+    if ($moved.FolderId -ne 'qa-target') { throw 'Mouse drag did not persist the destination folder.' }
+    $source = Find-Name $window 'QA RDP One' -Type $treeItem
+    Open-TreeContextMenu $window $source $app.Process.Id
+    $null = Find-Name $window 'QA RDP One (копия)' -Type $treeItem
+    Write-Host 'Dragging persisted the new folder, and right-click duplicate created a second profile.'
     Stop-App $app
     Write-Host 'Windows checks passed: RDP transports and tab switching, smart-card inheritance, collapsible inspector and tree search.'
 } catch {
