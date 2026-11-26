@@ -3,6 +3,7 @@ param([Parameter(Mandatory)][string] $Exe)
 
 Write-Host 'Loading installed-app UI automation helpers.'
 . (Join-Path $PSScriptRoot 'Test-Rdp030.ps1') -Exe $Exe -OnlyHelpers
+. (Join-Path $PSScriptRoot 'Test-RdpSessionControls.ps1')
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
     throw 'The RDP fixture is limited to disposable hosted Windows runners.'
 }
@@ -116,6 +117,37 @@ try {
         if (!$portReady) { Start-Sleep -Milliseconds 250 }
     }
     if (!$portReady) { throw 'The Windows RDP loopback listener did not become reachable in 18 seconds.' }
+    # Check the certificate presented by the *live* listener, including hostname
+    # and chain. Raw registry state can differ when TermService was already running.
+    $settings = Get-CimInstance -Namespace root/CIMV2/TerminalServices -ClassName Win32_TSGeneralSetting `
+        -Filter "TerminalName='RDP-tcp'" -OperationTimeoutSec 12
+    if ($settings.SSLCertificateSHA1Hash -ne $certificate.Thumbprint) {
+        Set-CimInstance -InputObject $settings -Property @{ SSLCertificateSHA1Hash = $certificate.Thumbprint } -OperationTimeoutSec 12
+    }
+    $probe = [Net.Sockets.TcpClient]::new()
+    try {
+        $probe.ReceiveTimeout = 4000
+        $probe.SendTimeout = 4000
+        $probe.Connect([Net.IPAddress]::Loopback, $port)
+        $transport = $probe.GetStream()
+        # TPKT + X.224 connection request, negotiating TLS or CredSSP.
+        [byte[]]$hello = @(3,0,0,19,14,224,0,0,0,0,0,1,0,8,0,3,0,0,0)
+        $transport.Write($hello,0,$hello.Length)
+        $reader = [IO.BinaryReader]::new($transport, [Text.Encoding]::ASCII, $true)
+        $header = $reader.ReadBytes(4)
+        if ($header.Count -ne 4 -or $header[0] -ne 3) { throw 'Unexpected fixture RDP negotiation header.' }
+        $length = 256 * $header[2] + $header[3] - 4
+        if ($length -lt 15 -or $length -gt 512) { throw 'Unexpected fixture RDP negotiation length.' }
+        $body = $reader.ReadBytes($length)
+        if ($body.Count -ne $length -or $body[7] -ne 2) { throw 'Fixture endpoint did not negotiate TLS/CredSSP.' }
+        $tls = [Net.Security.SslStream]::new($transport, $true)
+        try {
+            $tls.AuthenticateAsClient($hostname)
+            if ($tls.RemoteCertificate.GetCertHashString() -ne $certificate.Thumbprint) {
+                throw 'The live RDP listener presented a different certificate.'
+            }
+        } finally { $tls.Dispose() }
+    } finally { $probe.Dispose() }
     Write-Host 'The isolated Windows RDP listener and its test certificate are ready.'
 
     $credential = [Convert]::ToBase64String([Security.Cryptography.ProtectedData]::Protect(
@@ -135,27 +167,24 @@ try {
     Write-Host 'Launching Remote Workspace for the authenticated test.'
     $app = Open-App
     $window = $app.Window
-    foreach ($name in @('RDP Live Alpha', 'RDP Live Beta')) {
+    $names = @('RDP Live Alpha', 'RDP Live Beta')
+    $controls = Get-FixtureControls $window $names
+    for ($i = 0; $i -lt $names.Count; $i++) {
+        $name = $names[$i]
         Write-Host "Opening the $name tab."
-        $item = Find-Name $window $name -Type ([Windows.Automation.ControlType]::TreeItem)
-        $item.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
-        Invoke-Control $window 'Подключиться'
-        $loggedIn = $false
+        $controls.Items[$name].Select()
+        $controls.Connect.Invoke()
+        $active = $false
         $deadline = [DateTime]::UtcNow.AddSeconds(35)
-        while (!$loggedIn -and [DateTime]::UtcNow -lt $deadline) {
-            Start-Sleep -Milliseconds 350
-            $loggedIn = $null -ne (Find-Name $window "Сеанс активен · $hostname · $port" -Optional)
+        while (!$active -and [DateTime]::UtcNow -lt $deadline) {
+            Start-Sleep -Milliseconds 500
+            $users = (& quser.exe) -join [Environment]::NewLine
+            $active = $users -match ('(?im)^\s*>?\s*' + $accountNames[$i] + '\s+.*\bActive\b')
         }
-        if (!$loggedIn) {
-            $id = [Windows.Automation.PropertyCondition]::new(
-                [Windows.Automation.AutomationElement]::AutomationIdProperty, 'RdpStatus')
-            $status = $window.FindAll($tree, $id) | ForEach-Object { $_.Current.Name }
-            throw "$name did not complete Windows logon. RDP status: $($status -join ' | ')"
-        }
+        if (!$active) { throw "$name did not complete Windows logon within 35 seconds." }
         Write-Host "$name completed Windows logon."
     }
-    $null = Find-Name $window 'RDP Live Alpha' -Type ([Windows.Automation.ControlType]::ListItem)
-    $null = Find-Name $window 'RDP Live Beta' -Type ([Windows.Automation.ControlType]::ListItem)
+    Select-FixtureTabs $window $names
     $sessions = (& quser.exe) -join [Environment]::NewLine
     if ($sessions -notmatch '(?im)^\s*>?\s*rw030alpha\s+.*\bActive\b' -or
         $sessions -notmatch '(?im)^\s*>?\s*rw030beta\s+.*\bActive\b') {
@@ -168,7 +197,10 @@ try {
         'Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational',
         'Microsoft-Windows-TerminalServices-RDPClient/Operational')) {
         $events = @(Get-WinEvent -FilterHashtable @{LogName=$channel; StartTime=$testStart} -MaxEvents 10 -ErrorAction SilentlyContinue)
-        if ($events.Count) { Write-Host ("$channel event IDs: " + ($events.Id -join ', ')) }
+        foreach ($event in $events) {
+                $description = ($event.Message -replace '\s+', ' ').Trim()
+                Write-Host ("$channel event " + $event.Id + ': ' + $description)
+            }
     }
     throw
 } finally {

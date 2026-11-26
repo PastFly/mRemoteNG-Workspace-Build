@@ -2,6 +2,7 @@
 param([Parameter(Mandatory)][string] $Exe)
 
 . (Join-Path $PSScriptRoot 'Test-Rdp030.ps1') -Exe $Exe -OnlyHelpers
+. (Join-Path $PSScriptRoot 'Test-RdpSessionControls.ps1')
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
     throw 'The WSL RDP fixture requires a disposable hosted Windows runner.'
 }
@@ -65,9 +66,11 @@ try {
     "<Catalog><Revision>independent-rdp-fixture</Revision><Folders/><Profiles>$profiles</Profiles></Catalog>" |
         Set-Content -LiteralPath $store -Encoding UTF8
     $app = Open-App
-    foreach ($username in @('rwalpha','rwbeta')) {
-        $null = Select-Item $app.Window $username ([Windows.Automation.ControlType]::TreeItem)
-        Invoke-Control $app.Window 'Подключиться'
+    $names = @('rwalpha','rwbeta')
+    $controls = Get-FixtureControls $app.Window $names
+    foreach ($username in $names) {
+        $controls.Items[$username].Select()
+        $controls.Connect.Invoke()
         $ready = $false
         $deadline = [DateTime]::UtcNow.AddSeconds(30)
         while ([DateTime]::UtcNow -lt $deadline -and !$ready) {
@@ -75,16 +78,11 @@ try {
             & $wsl -d $distro -u root --exec /usr/bin/test -s "/home/$username/.remote-workspace-display"
             $ready = $LASTEXITCODE -eq 0
         }
-        if (!$ready) {
-            $id = [Windows.Automation.PropertyCondition]::new(
-                [Windows.Automation.AutomationElement]::AutomationIdProperty, 'RdpStatus')
-            $statuses = $app.Window.FindAll($tree, $id) | ForEach-Object { $_.Current.Name }
-            throw "No authenticated desktop appeared for $username. App status: $($statuses -join ' | ')"
-        }
+        if (!$ready) { throw "No authenticated desktop appeared for $username." }
         Write-Host "Independent RDP server confirmed the authenticated graphical desktop for $username."
     }
-    $displays = foreach ($username in @('rwalpha','rwbeta')) {
-        $null = Select-Item $app.Window $username ([Windows.Automation.ControlType]::ListItem)
+    Select-FixtureTabs $app.Window $names
+    $displays = foreach ($username in $names) {
         Run-Linux -Arguments @('/bin/cat',"/home/$username/.remote-workspace-display")
         $null = Run-Linux -Arguments @('/usr/bin/pgrep','-u',$username,'-x','xmessage')
     }
