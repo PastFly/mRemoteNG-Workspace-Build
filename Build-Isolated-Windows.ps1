@@ -58,10 +58,10 @@ if ($Phase -eq 'Build') {
     $msis = @(Get-ChildItem -LiteralPath (Join-Path $source 'installer\bin') -Filter 'Remote-Workspace-x64.msi' -File -Recurse)
     if ($msis.Count -ne 1) { throw "Expected exactly one MSI, found $($msis.Count)." }
     New-Item -ItemType Directory -Path $dist -Force | Out-Null
-    $installer = Join-Path $dist 'Remote-Workspace-0.2.0-x64.msi'
+    $installer = Join-Path $dist 'Remote-Workspace-0.3.0-x64.msi'
     Copy-Item -LiteralPath $msis[0].FullName -Destination $installer
     $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-    Set-Content -LiteralPath (Join-Path $dist 'SHA256SUMS.txt') -Value "$hash  Remote-Workspace-0.2.0-x64.msi" -Encoding ascii
+    Set-Content -LiteralPath (Join-Path $dist 'SHA256SUMS.txt') -Value "$hash  Remote-Workspace-0.3.0-x64.msi" -Encoding ascii
 
     $installLog = Join-Path $base 'install.log'
     $installArguments = "/i `"$installer`" /qn /norestart /L*v `"$installLog`""
@@ -72,6 +72,11 @@ if ($Phase -eq 'Build') {
     }
     $exe = Join-Path $env:ProgramFiles 'Remote Workspace\RemoteWorkspace.exe'
     if (!(Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'The MSI did not install the x64 application.' }
+    foreach ($dependency in @('Interop.MSTSCLib.dll', 'AxInterop.MSTSCLib.dll')) {
+        if (!(Test-Path -LiteralPath (Join-Path (Split-Path -Parent $exe) $dependency))) {
+            throw "The MSI did not install $dependency."
+        }
+    }
     $registered = @(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
         Where-Object { $_.PSObject.Properties['DisplayName'] -and $_.DisplayName -eq 'Remote Workspace' })
     if ($registered.Count -ne 1) { throw 'Expected one uninstall entry for Remote Workspace.' }
@@ -80,4 +85,4 @@ if ($Phase -eq 'Build') {
 }
 
 $exe = Join-Path $env:ProgramFiles 'Remote Workspace\RemoteWorkspace.exe'
-& (Join-Path $PSScriptRoot 'Test-Catalog020.ps1') -Exe $exe
+& (Join-Path $PSScriptRoot 'Test-Rdp030.ps1') -Exe $exe
